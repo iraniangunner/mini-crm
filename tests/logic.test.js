@@ -1,15 +1,15 @@
-// Run with: node tests/stats.test.js
+// Run with: node tests/logic.test.js
 // Loads the browser scripts into one shared context, the same way <script> tags share globals.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 const ctx = vm.createContext({ Intl });
-for (const file of ['utils.js', 'stats.js']) {
+for (const file of ['utils.js', 'logic.js', 'sample-data.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8'), ctx, { filename: file });
 }
-const { avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch } =
-  vm.runInContext('({ avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch })', ctx);
+const { avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch, buildSampleData } =
+  vm.runInContext('({ avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch, buildSampleData })', ctx);
 
 const STATUS_IDS = ['new', 'contacted', 'test_drive', 'purchased', 'cancelled'];
 const T0 = Date.parse('2026-10-01T10:00:00Z');
@@ -84,6 +84,12 @@ function testAverage() {
     { name: 'avg rounds to one decimal "۱۴٫۳ روز"', ok: formatAvgDays(14.3456) === '۱۴٫۳ روز', detail: formatAvgDays(14.3456) },
     { name: 'no data text', ok: formatAvgDays(null) === NO_DATA && formatRate(computeStats([], STATUS_IDS).conversionRate) === NO_DATA, detail: formatAvgDays(null) },
   );
+
+  // The shipped sample data (fixed "now"): purchases after ~9, ~14 and ~20 days -> what the
+  // summary bar shows on first open.
+  const sample = buildSampleData(new Date('2026-10-24T12:00:00')).customers;
+  const sampleAvg = avgDaysToPurchase(sample);
+  checks.push({ name: 'sample data: 3 purchases, average shown as "۱۴٫۳ روز"', ok: sample.filter((c) => c.status === 'purchased').length === 3 && formatAvgDays(sampleAvg) === '۱۴٫۳ روز', detail: `${sampleAvg} -> ${formatAvgDays(sampleAvg)}` });
 
   return checks;
 }

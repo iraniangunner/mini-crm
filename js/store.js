@@ -1,12 +1,12 @@
-// Single source of truth for customer data, persisted to localStorage.
+// تنها منبع داده‌ی مشتری‌ها؛ ذخیره در localStorage. هر تغییری فقط از این‌جا انجام می‌شود.
 
 const Store = (() => {
   const KEY = 'miniCrm.v1';
-  const BACKUP_KEY = 'miniCrm.v1.backup';
+  const BACKUP_KEY = 'miniCrm.v1.backup'; // داده‌ی خراب قبل از جایگزینی این‌جا نگه داشته می‌شود
   const STATUS_IDS = STATUSES.map((s) => s.id);
   const SOURCE_IDS = SOURCES.map((s) => s.id);
 
-  let notice = null; // message for the UI about load/save problems
+  let notice = null; // پیام مشکل بارگذاری/ذخیره برای نمایش در صفحه
   let data = load();
 
   function isValidEntry(h) {
@@ -15,8 +15,9 @@ const Store = (() => {
     return (h.type === 'created' || h.type === 'moved') && STATUS_IDS.includes(h.to);
   }
 
-  // Returns a clean customer, or null when it can't be repaired (no name/id/creation record).
-  // Status is re-derived from history so the two can never disagree.
+  // مشتری تمیزشده، یا null اگر قابل تعمیر نباشد (بدون شناسه، نام، شماره یا رکورد ساخت).
+  // فیلدهای اختیاری ناقص مقدار پیش‌فرض می‌گیرند. وضعیت از تاریخچه بازسازی می‌شود تا
+  // هیچ‌وقت با آن ناسازگار نباشد.
   function sanitize(c) {
     if (!c || typeof c !== 'object' || typeof c.id !== 'string') return null;
     if (typeof c.name !== 'string' || !c.name.trim() || typeof c.phone !== 'string') return null;
@@ -49,14 +50,15 @@ const Store = (() => {
     try {
       localStorage.setItem(BACKUP_KEY, raw);
     } catch (e) {
-      console.error('Could not back up unreadable data.', e);
+      console.warn('Could not back up unreadable data.', e);
     }
   }
 
+  // بارگذاری امن: localStorage خالی ← داده‌ی نمونه. داده‌ی خراب یا ناشناخته ← داده‌ی نمونه،
+  // ولی نسخه‌ی اصلی هیچ‌وقت بی‌صدا پاک نمی‌شود (در BACKUP_KEY می‌ماند) و پیام نشان داده می‌شود.
   function load() {
     const raw = readRaw();
     if (raw == null) {
-      // First run (or storage unavailable): start with sample data.
       const fresh = buildSampleData();
       persist(fresh);
       return fresh;
@@ -66,7 +68,7 @@ const Store = (() => {
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
-      // handled below
+      // پایین‌تر به‌عنوان داده‌ی خراب رسیدگی می‌شود
     }
 
     if (parsed && parsed.version === 1 && Array.isArray(parsed.customers)) {
@@ -76,25 +78,25 @@ const Store = (() => {
       if (dropped) {
         backup(raw);
         persist(loaded);
-        notice = `${toFaDigits(dropped)} مشتری به‌خاطر داده‌ی ناقص کنار گذاشته شد. نسخه‌ی اصلی با کلید ${BACKUP_KEY} در localStorage نگه داشته شد.`;
+        notice = `${toFaDigits(dropped)} مشتری به‌خاطر داده‌ی ناقص کنار گذاشته شد. نسخه‌ی اصلی به‌عنوان پشتیبان در مرورگر نگه داشته شد.`;
       }
       return loaded;
     }
 
-    // Unreadable or unknown format: keep the original, never silently overwrite it.
     backup(raw);
-    notice = `داده‌ی ذخیره‌شده قابل خواندن نبود و داده‌ی نمونه بارگذاری شد. نسخه‌ی اصلی با کلید ${BACKUP_KEY} در localStorage نگه داشته شد.`;
+    notice = 'داده‌ی ذخیره‌شده قابل خواندن نبود و داده‌ی نمونه بارگذاری شد. نسخه‌ی اصلی به‌عنوان پشتیبان در مرورگر نگه داشته شد.';
     const fresh = buildSampleData();
     persist(fresh);
     return fresh;
   }
 
+  // خطای ذخیره به کاربر نشان داده می‌شود (notice)؛ در Console فقط هشدار است چون رسیدگی شده.
   function persist(d) {
     try {
       localStorage.setItem(KEY, JSON.stringify(d));
       return true;
     } catch (e) {
-      console.error('Could not save data.', e);
+      console.warn('Could not save data.', e);
       notice = 'ذخیره انجام نشد (حافظه‌ی مرورگر پر یا غیرفعال است)؛ تغییرات بعد از بستن صفحه از بین می‌رود.';
       return false;
     }
@@ -119,7 +121,6 @@ const Store = (() => {
       return data.customers.find((c) => c.phone === phone && c.id !== exceptId);
     },
 
-    // Pending load/save problem for the UI, or null.
     notice() {
       return notice;
     },
@@ -128,6 +129,7 @@ const Store = (() => {
       notice = null;
     },
 
+    // ثبت تاریخچه: ساخت مشتری همیشه اولین رکورد است (ورود به «جدید»).
     create(fields) {
       const now = new Date().toISOString();
       const customer = {
@@ -142,6 +144,7 @@ const Store = (() => {
       return customer;
     },
 
+    // ویرایش مشخصات در تاریخچه ثبت نمی‌شود.
     update(id, fields) {
       const c = find(id);
       if (!c) return;
@@ -154,7 +157,8 @@ const Store = (() => {
       save();
     },
 
-    // Returns false when nothing changed (unknown id, unknown status or same column).
+    // ثبت تاریخچه: هر جابه‌جایی یک رکورد «از ← به» با زمان دقیق می‌سازد. کشیدن و منو هر دو
+    // فقط همین را صدا می‌زنند. انداختن در همان ستون هیچ رکوردی نمی‌سازد (false برمی‌گرداند).
     move(id, to) {
       const c = find(id);
       if (!c || c.status === to || !STATUS_IDS.includes(to)) return false;
@@ -164,6 +168,7 @@ const Store = (() => {
       return true;
     },
 
+    // یادداشت تماس هم در تاریخچه می‌آید ولی وضعیت را عوض نمی‌کند (رکورد note «to» ندارد).
     addNote(id, text) {
       const c = find(id);
       const trimmed = text.trim();

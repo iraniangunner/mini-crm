@@ -35,6 +35,8 @@ export async function startBrowser(port = 9334) {
     if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
     if (msg.method === 'Runtime.exceptionThrown') errors.push(msg.params.exceptionDetails.exception?.description || msg.params.exceptionDetails.text);
     if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') errors.push(msg.params.args.map((a) => a.value ?? a.description).join(' '));
+    // Browser-level errors (failed file/network loads, CSP, ...) that never reach page JS.
+    if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error') errors.push(`[${msg.params.entry.source}] ${msg.params.entry.text} ${msg.params.entry.url || ''}`.trim());
   });
   const send = (method, params = {}) => new Promise((r) => { const id = nextId++; pending.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
   const ev = async (expr) => {
@@ -45,6 +47,12 @@ export async function startBrowser(port = 9334) {
   const load = async (url) => { await send(url ? 'Page.navigate' : 'Page.reload', url ? { url } : {}); await sleep(700); };
   const shot = async (file) => { const s = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); writeFileSync(file, Buffer.from(s.result.data, 'base64')); };
   const width = async (w, h = 900) => { await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 700 }); await sleep(200); };
-  await send('Runtime.enable'); await send('Page.enable');
+  await send('Runtime.enable'); await send('Page.enable'); await send('Log.enable');
+  // Offline guarantee: any request that isn't a local file is an error.
+  await send('Network.enable');
+  ws.addEventListener('message', (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.method === 'Network.requestWillBeSent' && !/^(file|data|about|blob):/.test(msg.params.request.url)) errors.push(`[network] non-local request: ${msg.params.request.url}`);
+  });
   return { send, ev, load, shot, width, errors, close: () => { ws.close(); chrome.kill(); } };
 }

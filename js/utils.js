@@ -1,5 +1,6 @@
-// Shared constants and helpers. Loaded first; exposes globals for the other scripts.
+// ثابت‌ها و توابع کمکی مشترک. اول از همه بار می‌شود و بقیه‌ی فایل‌ها از این‌ها استفاده می‌کنند.
 
+// ترتیب ستون‌ها همین ترتیب آرایه است.
 const STATUSES = [
   { id: 'new', label: 'جدید' },
   { id: 'contacted', label: 'تماس گرفته شد' },
@@ -23,7 +24,7 @@ function labelOf(list, id) {
   return item ? item.label : id;
 }
 
-// Persian (۰-۹) and Arabic (٠-٩) digits -> Latin.
+// ارقام فارسی (۰-۹) و عربی (٠-٩) ← انگلیسی؛ برای اعتبارسنجی و جستجو.
 function toLatinDigits(str) {
   return String(str)
     .replace(/[۰-۹]/g, (d) => d.charCodeAt(0) - 0x06f0)
@@ -34,7 +35,8 @@ function toFaDigits(value) {
   return String(value).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
 }
 
-// Returns "09xxxxxxxxx" or null when the input is not a valid Iranian mobile number.
+// شماره‌ی موبایل ایران را به شکل "09xxxxxxxxx" برمی‌گرداند، یا null اگر معتبر نباشد.
+// ارقام فارسی، فاصله، خط تیره و پیشوند +98 / 0098 / 98 پذیرفته می‌شوند.
 function normalizePhone(input) {
   let s = toLatinDigits(input).replace(/[\s\-()]/g, '');
   if (s.startsWith('+98')) s = '0' + s.slice(3);
@@ -48,8 +50,8 @@ function formatPhone(phone) {
   return toFaDigits(phone.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1 $2 $3'));
 }
 
-// Digits-only parse of a budget field; null when empty. Capped at 15 digits so the
-// number stays exact (Number.MAX_SAFE_INTEGER has 16).
+// بودجه: فقط رقم‌ها خوانده می‌شوند؛ خالی ← null. حداکثر ۱۵ رقم تا عدد در Number دقیق بماند
+// (Number.MAX_SAFE_INTEGER شانزده رقم دارد).
 const BUDGET_MAX_DIGITS = 15;
 
 function parseBudget(input) {
@@ -65,10 +67,11 @@ function formatBudget(n) {
   return n == null ? '—' : formatNumber(n) + ' تومان';
 }
 
+// تاریخ شمسی فقط با Intl، بدون کتابخانه.
 const dateFmt = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 const timeFmt = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
-// "۱۴۰۵/۰۸/۰۲" (Jalali). Built from parts so separators don't depend on the browser.
+// "۱۴۰۵/۰۸/۰۲". از اجزا ساخته می‌شود تا جداکننده به مرورگر وابسته نباشد.
 function jalaliDate(d) {
   const p = Object.fromEntries(dateFmt.formatToParts(d).map((x) => [x.type, x.value]));
   return `${p.year}/${p.month}/${p.day}`;
@@ -80,7 +83,7 @@ function formatDateTime(iso) {
   return `${jalaliDate(d)} ساعت ${timeFmt.format(d)}`;
 }
 
-// Local calendar dates as "YYYY-MM-DD" (the <input type="date"> value format).
+// تاریخ محلی به شکل "YYYY-MM-DD" (همان مقدار <input type="date">).
 function toYmd(d) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -90,7 +93,7 @@ function todayYmd() {
   return toYmd(new Date());
 }
 
-// "2026-10-27" -> "۱۴۰۵/۰۸/۰۵". Parsed as a local date, not UTC.
+// "2026-10-27" ← "۱۴۰۵/۰۸/۰۵". به‌عنوان تاریخ محلی خوانده می‌شود، نه UTC.
 function formatYmd(ymd) {
   const [y, m, d] = ymd.split('-').map(Number);
   return jalaliDate(new Date(y, m - 1, d));

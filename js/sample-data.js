@@ -1,20 +1,20 @@
-// Ten sample customers. Dates are relative to `now`, so the data always looks recent.
-// Purchased customers take 9, 14 and 20 days from creation to purchase (average 14.3).
-// Follow-ups (days from today, negative = past): 2 overdue, 2 today; closed customers with
-// past dates check that purchased/cancelled are never overdue.
+// ۱۰ مشتری نمونه. تاریخ‌ها نسبت به «الان» ساخته می‌شوند تا داده همیشه تازه به نظر برسد
+// (۲ تا ۶ هفته‌ی گذشته). سه مشتری خرید ۹، ۱۴ و ۲۰ روز از ثبت تا خرید طول کشیده‌اند ← میانگین ۱۴٫۳.
+// پیگیری‌ها (روز نسبت به امروز، منفی = گذشته): ۲ عقب‌افتاده، ۲ امروز؛ «خرید» و «انصراف» با
+// تاریخ گذشته نشان می‌دهند که این دو هیچ‌وقت عقب‌افتاده نمی‌شوند.
 
 const SAMPLE_CUSTOMERS = [
   {
     name: 'علی رضایی', phone: '09121234567', car: 'تویوتا کمری', budget: 4500000000, source: 'instagram', followUp: -10,
-    steps: [[40, 10], ['contacted', 39, 11], ['test_drive', 35, 16], ['note', 35, 17, 'تست‌درایو انجام شد، درباره‌ی رنگ سفید پرسید'], ['purchased', 31, 12]], // 9 days
+    steps: [[40, 10], ['contacted', 39, 11], ['test_drive', 35, 16], ['note', 35, 17, 'تست‌درایو انجام شد، درباره‌ی رنگ سفید پرسید'], ['purchased', 31, 12]], // ۹ روز
   },
   {
     name: 'مریم احمدی', phone: '09351112233', car: 'هیوندای توسان', budget: 3200000000, source: 'referral', followUp: null,
-    steps: [[33, 9], ['contacted', 32, 14], ['test_drive', 27, 17], ['purchased', 19, 9]], // 14 days
+    steps: [[33, 9], ['contacted', 32, 14], ['test_drive', 27, 17], ['purchased', 19, 9]], // ۱۴ روز
   },
   {
     name: 'رضا کریمی', phone: '09198887766', car: 'کیا اسپورتیج', budget: 2800000000, source: 'divar', followUp: null,
-    steps: [[28, 15], ['contacted', 26, 10], ['test_drive', 18, 11], ['purchased', 8, 15]], // 20 days
+    steps: [[28, 15], ['contacted', 26, 10], ['test_drive', 18, 11], ['purchased', 8, 15]], // ۲۰ روز
   },
   {
     name: 'سارا موسوی', phone: '09123456789', car: 'مزدا ۳', budget: 1900000000, source: 'walk_in', followUp: 0,
@@ -26,7 +26,7 @@ const SAMPLE_CUSTOMERS = [
     steps: [[21, 13], ['contacted', 19, 9], ['test_drive', 12, 17], ['note', 12, 18, 'از تست‌درایو راضی بود؛ منتظر جواب وام است']],
   },
   {
-    name: 'زهرا حسینی', phone: '09129990011', car: 'جک S5', budget: 1500000000, source: 'divar', followUp: -5,
+    name: 'زهرا حسینی', phone: '09129990011', car: 'جک اس۵', budget: 1500000000, source: 'divar', followUp: -5,
     steps: [[18, 10], ['contacted', 16, 15], ['note', 16, 16, 'قرار شد بعد از مشورت با خانواده تماس بگیرد']],
   },
   {
@@ -47,8 +47,8 @@ const SAMPLE_CUSTOMERS = [
   },
 ];
 
-// Steps: [daysAgo, hour] for creation, then [status, daysAgo, hour] per move
-// or ['note', daysAgo, hour, text] per note.
+// steps: اول [چند روز قبل, ساعت] برای ساخت، بعد برای هر جابه‌جایی [وضعیت, چند روز قبل, ساعت]
+// و برای هر یادداشت ['note', چند روز قبل, ساعت, متن]. تاریخچه به همین ترتیب ساخته می‌شود.
 function buildSampleData(now = new Date()) {
   const at = (daysAgo, hour) => {
     const d = new Date(now);

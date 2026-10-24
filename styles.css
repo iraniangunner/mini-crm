@@ -8,39 +8,37 @@
   --danger: #dc2626;
   --today: #ea580c;
   --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
-  /* Column colors: five distinct hues, none red/orange (reserved for overdue/today). */
+  /* رنگ ستون‌ها: پنج رنگ متمایز؛ قرمز و نارنجی برای «عقب‌افتاده» و «امروز» رزرو شده‌اند. */
   --col-new: #2563eb;
   --col-contacted: #7c3aed;
   --col-test_drive: #0891b2;
   --col-purchased: #16a34a;
   --col-cancelled: #6b7280;
-  /* Popups (dialogs, toast) never get closer than this to the screen edges. */
+  /* پنجره‌ها و پیام‌ها هیچ‌وقت از این نزدیک‌تر به لبه‌ی صفحه نمی‌شوند. */
   --popup-max: calc(100vw - 32px);
 }
 
 /* =====================================================================================
-   RULE: nothing scrolls horizontally, at any width, in any state (see CLAUDE.md): not the
-   page and not any element inside it, the board included. No overflow-x: auto/scroll
-   anywhere (the browser gives <dialog> and <textarea> overflow: auto by default; both are
-   overridden below). Content must fit: >= 1200px five equal shrinking columns, below
-   that one column at a time behind tabs.
-   Layer 1 (this section + the rules below): nothing is allowed to be wider than its box.
-   Layer 2: js/debug-overflow.js, enabled with ?debug=1, outlines anything that sticks out
-   of the viewport and any element whose content is wider than itself.
-   Layer 3: overflow-x: clip on html/body at the end of this file, a safety net only.
-   Also: logical properties only (inset-inline-*, margin-inline, padding-inline, text-align
-   start/end), no fixed widths over 320px (use max-width / %), no white-space: nowrap on
-   anything whose text can grow.
+   قانون: هیچ چیز، در هیچ عرضی و هیچ حالتی، اسکرول افقی ندارد (CLAUDE.md)؛ نه صفحه و نه
+   هیچ المانی داخلش، از جمله برد. هیچ overflow-x: auto/scroll نیست (مرورگر به <dialog> و
+   <textarea> به‌طور پیش‌فرض overflow: auto می‌دهد؛ هر دو پایین‌تر مهار شده‌اند).
+   محتوا باید جا شود: از ۱۲۰۰px پنج ستون مساوی که کوچک می‌شوند، کمتر از آن یک ستون پشت تب‌ها.
+   لایه‌ی ۱ (این بخش و قوانین پایین‌تر): هیچ چیز از کادرش پهن‌تر نمی‌شود.
+   لایه‌ی ۲: js/debug-overflow.js با ‎?debug=1، هر بیرون‌زدگی و هر محتوای پهن‌تر از ظرفش را نشان می‌دهد.
+   لایه‌ی ۳: overflow-x: clip روی html/body در انتهای فایل، فقط تور ایمنی.
+   همچنین: فقط ویژگی‌های منطقی (inset-inline-*، margin-inline، padding-inline، text-align:
+   start/end)، بدون عرض ثابت بیشتر از ۳۲۰px (به‌جایش max-width و درصد)، بدون white-space:
+   nowrap روی متنی که ممکن است بلند شود.
    ===================================================================================== */
 
-/* ---------- Layer 1: base rules ---------- */
+/* ---------- لایه‌ی ۱: قوانین پایه ---------- */
 
 *, *::before, *::after { box-sizing: border-box; }
 
 img, svg, video, canvas, input, select, textarea, table { max-width: 100%; }
 
-/* Closed things are removed from layout, never parked off-screen. Beats any class that
-   sets display (e.g. .notice { display: flex }). */
+/* چیزِ بسته از چیدمان حذف می‌شود، هیچ‌وقت بیرون از صفحه پارک نمی‌شود. بر هر کلاسی که display
+   تعیین می‌کند غلبه می‌کند (مثل .notice { display: flex }). */
 [hidden] { display: none !important; }
 
 body {
@@ -49,23 +47,23 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
-  /* Any long unbroken text (names, phone numbers, car names, notes, big numbers) wraps
-     instead of widening its box. word-break is the fallback for browsers without
-     overflow-wrap: anywhere (Safari < 15.4). Inherited by everything, dialogs included. */
+  /* هر متن بلند بدون فاصله (نام، شماره، اسم خودرو، یادداشت، عدد بزرگ) می‌شکند به‌جای اینکه
+   کادرش را پهن کند. word-break جایگزین مرورگرهای بدون overflow-wrap: anywhere است
+   (Safari قبل از ۱۵٫۴). به همه‌چیز، از جمله پنجره‌ها، ارث می‌رسد. */
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-/* Flex and grid items default to min-width: auto (= their content's width), which is how
-   one long word pushes a whole row off-screen. Every flex/grid container is listed here;
-   add new ones. :where() keeps specificity at zero so components can still override. */
+/* فرزندان flex و grid به‌طور پیش‌فرض min-width: auto (= پهنای محتوا) دارند؛ همین است که یک
+   کلمه‌ی بلند کل ردیف را از صفحه بیرون می‌برد. همه‌ی ظرف‌های flex/grid این‌جا فهرست شده‌اند؛
+   ظرف جدید را اضافه کن. :where() وزن انتخابگر را صفر نگه می‌دارد تا قابل بازنویسی بماند. */
 :where(.topbar, .actions, .notice, .summary, .stat, .toolbar, .check, .tabs, .tab, .board,
        .column-head, .column-body, .card-info, .card-actions, .detail-head, .detail-info,
        .note-form, .field, .form-actions) > * {
   min-width: 0;
 }
 
-/* ---------- Top bar & notice ---------- */
+/* ---------- نوار بالا و پیام هشدار ---------- */
 
 .topbar {
   display: flex;
@@ -96,7 +94,7 @@ body {
 }
 .notice-text { flex: 1 1 200px; }
 
-/* ---------- Buttons ---------- */
+/* ---------- دکمه‌ها ---------- */
 
 .btn {
   font: inherit;
@@ -115,7 +113,7 @@ body {
 .btn.danger:hover { border-color: var(--danger); }
 .btn.small { padding: 2px 10px; font-size: .85rem; }
 
-/* ---------- Summary bar ---------- */
+/* ---------- نوار خلاصه ---------- */
 
 .summary {
   display: flex;
@@ -141,7 +139,7 @@ body {
 .stat[data-key="overdue"] .stat-value { color: var(--danger); }
 .stat.no-data .stat-value { font-size: .9rem; font-weight: normal; color: var(--muted); }
 
-/* ---------- Toolbar ---------- */
+/* ---------- جستجو و فیلتر ---------- */
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px 0; }
 .toolbar input[type="search"] {
@@ -154,10 +152,10 @@ body {
 }
 .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
-/* ---------- Status tabs (only below 1200px, see the tabbed-view media query) ---------- */
+/* ---------- تب‌های وضعیت (فقط زیر ۱۲۰۰px، media query نمای تبی) ---------- */
 
 .tabs { display: none; }
-/* Tabs size to their label and wrap to a second row when they don't fit; never scroll. */
+/* تب‌ها به اندازه‌ی برچسبشان‌اند و اگر جا نشوند به ردیف دوم می‌روند؛ هرگز اسکرول. */
 .tab {
   font: inherit;
   flex: 1 1 auto;
@@ -176,7 +174,7 @@ body {
   cursor: pointer;
 }
 .tab-label { font-size: .78rem; line-height: 1.3; text-align: center; }
-/* "۱۲۰۰ از ۱۲۰۲" while searching must wrap inside a ~55px tab, not spill out. */
+/* «۱۲۰۰ از ۱۲۰۲» هنگام جستجو باید داخل تب بشکند، نه بیرون بریزد. */
 .tab .count { font-size: .75rem; padding: 0 6px; max-width: 100%; text-align: center; line-height: 1.4; }
 .tab.active {
   color: var(--text);
@@ -188,7 +186,7 @@ body {
 .tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .tab.drop-target { background: color-mix(in srgb, var(--col-color) 20%, #fff); }
 
-/* Fixed popup: both inline edges pinned 16px in, so it can't leave the screen on either side. */
+/* پیام ثابت: هر دو لبه‌ی inline ‏۱۶px داخل مهار شده‌اند، پس از هیچ طرف بیرون نمی‌زند. */
 .toast {
   position: fixed;
   inset-inline: 16px;
@@ -205,10 +203,10 @@ body {
   z-index: 10;
 }
 
-/* ---------- Board ---------- */
+/* ---------- برد ---------- */
 
-/* >= 1200px: five equal columns that shrink with the window. No fixed or minimum width and
-   no scrolling; below 1200px the tabbed view takes over before columns get too narrow. */
+/* از ۱۲۰۰px: پنج ستون مساوی که با پنجره کوچک می‌شوند؛ بدون عرض ثابت یا حداقل و بدون
+   اسکرول. زیر ۱۲۰۰px، پیش از آنکه ستون‌ها خیلی باریک شوند، نمای تبی جایگزین می‌شود. */
 .board {
   display: flex;
   gap: 12px;
@@ -250,7 +248,7 @@ body {
 .column-body { display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
 .empty { color: var(--muted); text-align: center; font-size: .85rem; padding: 16px 8px; }
 
-/* ---------- Card ---------- */
+/* ---------- کارت ---------- */
 
 .card {
   background: var(--surface);
@@ -265,7 +263,7 @@ body {
 .card:hover, .card:focus-visible { border-color: var(--primary); outline: none; }
 .card.dragging { opacity: .4; }
 .card-name { margin: 0; font-size: 1rem; }
-/* dir="ltr" element: "end" is the right edge, lining it up with the RTL text around it. */
+/* المان dir="ltr": «end» یعنی لبه‌ی راست، هم‌تراز با متن راست‌چین اطراف. */
 .card-phone { color: var(--muted); text-align: end; }
 .card-info {
   display: grid;
@@ -277,7 +275,7 @@ body {
 .card-info dd { margin: 0; }
 .card-followup { font-size: .85rem; margin-block-end: 2px; }
 .card-since { color: var(--muted); font-size: .8rem; }
-/* Menu on its own row; the two buttons share the next row and wrap if even that is too narrow. */
+/* منو در ردیف خودش؛ دو دکمه ردیف بعد را با هم پر می‌کنند و اگر آن هم جا نشد می‌شکنند. */
 .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-block-start: 8px; }
 .card-actions .btn { flex: 1 1 auto; }
 .move-select { font: inherit; font-size: .85rem; flex: 1 1 100%; padding: 2px 4px; }
@@ -291,12 +289,11 @@ body {
 .card.today .flag { background: var(--today); }
 .card.today .followup-date { color: var(--today); font-weight: bold; }
 
-/* ---------- Dialogs ---------- */
+/* ---------- پنجره‌ها ---------- */
 
-/* Modal dialogs are centred by the browser (margin: auto in the top layer), so capping the
-   width is enough to keep both edges on screen. The native <select> list and date picker
-   are drawn by the browser outside the page and positioned by it; CSS can't move them and
-   they can't make the page scroll. */
+/* پنجره‌ی modal را مرورگر وسط می‌گذارد (margin: auto در top layer)، پس محدود کردن پهنا برای
+   ماندن هر دو لبه در صفحه کافی است. فهرست <select> و انتخابگر تاریخ را مرورگر بیرون از
+   صفحه می‌کشد و جایشان را خودش تعیین می‌کند؛ CSS به آن‌ها دسترسی ندارد و صفحه را اسکرولی نمی‌کنند. */
 dialog {
   border: none;
   border-radius: 12px;
@@ -304,8 +301,8 @@ dialog {
   width: 100%;
   max-width: min(420px, var(--popup-max));
   max-height: calc(100dvh - 32px);
-  /* The browser default is overflow: auto (both axes). Tall content scrolls vertically;
-     horizontally everything must fit (layer 1), so nothing to scroll there. */
+  /* پیش‌فرض مرورگر overflow: auto (هر دو محور) است. محتوای بلند عمودی اسکرول می‌خورد؛
+   افقی همه‌چیز باید جا شود (لایه‌ی ۱)، پس چیزی برای اسکرول نیست. */
   overflow-x: hidden;
   overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
@@ -325,7 +322,7 @@ dialog h2 { margin-top: 0; }
   border-color: var(--primary);
 }
 .field input[dir="ltr"] { text-align: end; }
-/* iOS gives date inputs an intrinsic min-width that can push past the dialog. */
+/* iOS به فیلد تاریخ یک حداقل پهنای ذاتی می‌دهد که می‌تواند از پنجره بیرون بزند. */
 .field input[type="date"] { display: block; width: 100%; min-width: 0; }
 .field input.invalid { border-color: var(--danger); }
 .req { color: var(--danger); }
@@ -357,7 +354,7 @@ dialog h2 { margin-top: 0; }
   border: 1px solid var(--border);
   border-radius: 6px;
   resize: vertical;
-  /* Default is overflow: auto; text soft-wraps, so only the vertical axis may scroll. */
+  /* پیش‌فرض overflow: auto است؛ متن خودش می‌شکند، پس فقط محور عمودی اسکرول می‌خورد. */
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -387,11 +384,11 @@ dialog h2 { margin-top: 0; }
 .timeline li.note { color: var(--muted); }
 .timeline li.note::before { background: var(--surface); border: 2px solid var(--primary); width: 8px; height: 8px; }
 
-/* ---------- Tabbed view (< 1200px) ---------- */
+/* ---------- نمای تبی (زیر ۱۲۰۰px) ---------- */
 
-/* Below 1200px five columns would be too narrow, so the board shows one status at a time
-   behind tabs (keep the breakpoint in sync with tabbedQuery in app.js). Moves go through
-   the "انتقال به..." menu, or by dropping a dragged card on a tab. */
+/* زیر ۱۲۰۰px پنج ستون خیلی باریک می‌شوند، پس برد هر بار یک وضعیت را پشت تب‌ها نشان می‌دهد
+   (breakpoint باید با tabbedQuery در app.js یکی باشد). جابه‌جایی با منوی «انتقال به...»
+   یا رها کردن کارت روی تب. */
 @media (max-width: 1199.98px) {
   .tabs {
     display: flex;
@@ -403,8 +400,8 @@ dialog h2 { margin-top: 0; }
   .column { display: none; min-height: 0; border-top: none; border-start-start-radius: 0; border-start-end-radius: 0; }
   .column.active { display: block; }
   .column-head { display: none; }
-  /* The one visible column is wide on tablets: lay its cards out in as many columns as
-     fit, each at least 260px (or the full width if that's less). */
+  /* تنها ستونِ دیده‌شده روی تبلت پهن است: کارت‌هایش در هر تعداد ستون که جا شود چیده می‌شوند،
+   هر کدام حداقل ۲۶۰px (یا تمام پهنا اگر کمتر باشد). */
   .column-body {
     min-height: 0;
     display: grid;
@@ -414,25 +411,24 @@ dialog h2 { margin-top: 0; }
   .column-body > .empty { grid-column: 1 / -1; }
 }
 
-/* ---------- Phones (< 768px) ---------- */
+/* ---------- گوشی (زیر ۷۶۸px) ---------- */
 
 @media (max-width: 767.98px) {
   .toolbar input[type="search"] { max-width: none; }
-  /* Compact 3-column summary so the tabs stay near the top of the screen. */
+  /* نوار خلاصه‌ی سه‌ستونه‌ی جمع‌وجور تا تب‌ها بالای صفحه بمانند. */
   .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .stat { min-width: 0; padding: 4px 8px; }
   .stat-label { font-size: .72rem; line-height: 1.35; }
   .stat-value { font-size: 1rem; }
   .stat.no-data .stat-value { font-size: .78rem; }
-  /* iOS Safari zooms the page when focusing a control under 16px; after that the page
-     pans sideways. Keep every focusable text control at 16px on phones. */
+  /* Safari روی iOS با فوکوس روی فیلدِ زیر ۱۶px صفحه را زوم می‌کند و بعد صفحه کنار می‌رود؛
+   روی گوشی همه‌ی فیلدها ۱۶px. */
   input, select, textarea, .move-select { font-size: 16px; }
 }
 
-/* ---------- Layer 3: safety net ---------- */
+/* ---------- لایه‌ی ۳: تور ایمنی ---------- */
 
-/* Only a net under layer 1, never a fix: if something still sticks out it is clipped
-   instead of making the page scrollable. clip (not hidden) creates no scroll container,
-   so position: sticky keeps working. It also hides overflow from scrollWidth, so check new
-   changes with ?debug=1 (layer 2), which sees through it. */
+/* فقط توری زیر لایه‌ی ۱، هرگز راه‌حل: اگر چیزی باز هم بیرون بزند بریده می‌شود به‌جای اینکه
+   صفحه اسکرولی شود. clip (نه hidden) ظرف اسکرول نمی‌سازد، پس position: sticky سالم می‌ماند.
+   سرریز را از scrollWidth هم پنهان می‌کند، پس تغییرات را با ‎?debug=1 (لایه‌ی ۲) بررسی کن. */
 html, body { overflow-x: clip; }

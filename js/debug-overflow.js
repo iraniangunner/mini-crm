@@ -1,12 +1,12 @@
-// Layer 2 of the no-horizontal-scroll rule: an overflow tracker, active only with ?debug=1.
-// Re-checks after every DOM change (dialog opened, tab switched, card added, ...) and on
-// resize. Two kinds of offender get a red outline and a console entry:
-//   1. anything (element or text) sticking out past the viewport's left/right edge;
-//   2. any element whose content is wider than itself (scrollWidth > clientWidth), i.e. a
-//      horizontal scrollbar, clipped content or content spilling out of its box.
-// A corner badge shows green (clean) or red (count).
-// It measures element boxes, not scrollWidth, so it still sees overflow that the
-// overflow-x: clip safety net on html/body would hide.
+// لایه‌ی ۲ قانون «هیچ اسکرول افقی»: ردیاب سرریز، فقط با ‎?debug=1 فعال می‌شود و در حالت عادی
+// هیچ کاری نمی‌کند (حتی استایل یا المانی اضافه نمی‌کند).
+// بعد از هر تغییر DOM (باز شدن پنجره، عوض شدن تب، اضافه شدن کارت...) و تغییر اندازه دوباره
+// بررسی می‌کند. دو نوع مشکل کادر قرمز می‌گیرند و در Console نوشته می‌شوند:
+//   ۱. هر المان یا متنی که از لبه‌ی چپ/راست صفحه بیرون زده؛
+//   ۲. هر المانی که محتوایش از خودش پهن‌تر است (scrollWidth > clientWidth): اسکرول‌بار افقی،
+//      محتوای بریده‌شده یا محتوای بیرون‌ریخته. html و body هم بررسی می‌شوند، پس سرریزی که
+//      تور ایمنی (overflow-x: clip) پنهانش کرده هم دیده می‌شود.
+// نشانگر گوشه: سبز = سالم، قرمز = تعداد مشکل‌ها.
 
 (() => {
   if (new URLSearchParams(location.search).get('debug') !== '1') return;
@@ -21,20 +21,19 @@
       color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.3); }`;
   document.head.append(style);
 
-  // Lives on <html>, outside the observed <body>, so updating it can't retrigger a scan.
+  // نشانگر روی <html> است، بیرون از <body>ِ زیر نظر، تا به‌روز کردنش بررسی تازه راه نیندازد.
   const badge = document.createElement('div');
   badge.id = 'debug-overflow-badge';
-  badge.title = 'Overflow tracker (?debug=1). Click to log again.';
+  badge.title = 'ردیاب سرریز (?debug=1). برای گزارش دوباره در Console کلیک کنید.';
   document.documentElement.append(badge);
 
-  // Clipping ancestors, except html/body: their clip is the safety net we want to see past.
-  // Returns the horizontal extent of rect r (belonging to el or to text inside it) as
-  // actually visible on screen.
+  // بخشی از مستطیل r (مال el یا متن داخلش) که واقعاً روی صفحه دیده می‌شود، با حساب کردن
+  // والدهایی که محتوا را می‌بُرند؛ به‌جز html/body که clipشان همان تور ایمنی است و باید از آن رد شویم.
   function visibleExtent(r, el) {
     let left = r.left;
     let right = r.right;
     for (let p = el; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
-      if (p === el && el.nodeType === 1 && r.isElementBox) continue; // an element doesn't clip its own box
+      if (p === el && el.nodeType === 1 && r.isElementBox) continue; // المان کادر خودش را نمی‌بُرد
       if (getComputedStyle(p).overflowX !== 'visible') {
         const pr = p.getBoundingClientRect();
         left = Math.max(left, pr.left);
@@ -50,15 +49,15 @@
     return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + cls;
   }
 
-  // Returns [{ el, name, left, right }] for the outermost elements past the viewport.
-  // left/right = pixels sticking out on that side. Checks element boxes AND text: a long
-  // word spilling out of its box doesn't change the box's rect, but it does scroll the page.
+  // [{ el, name, left, right, excess }]. left/right = چند پیکسل از آن طرف بیرون زده.
+  // هم کادر المان‌ها و هم خود متن اندازه گرفته می‌شود: کلمه‌ی بلندی که از کادرش بیرون می‌ریزد
+  // کادر را تغییر نمی‌دهد ولی صفحه را اسکرولی می‌کند.
   function scan() {
-    const vw = document.documentElement.clientWidth; // excludes the vertical scrollbar
+    const vw = document.documentElement.clientWidth; // بدون اسکرول‌بار عمودی
     const found = new Map(); // el -> { left, right, text }
     const add = (el, rect, isText) => {
       const { left, right } = visibleExtent(rect, el);
-      if (right <= left) return; // fully clipped by an inner scroller (e.g. the board)
+      if (right <= left) return; // کاملاً توسط یک والد بریده شده
       const outLeft = Math.max(0, -left);
       const outRight = Math.max(0, right - vw);
       if (outLeft <= 0.5 && outRight <= 0.5) return;
@@ -84,12 +83,10 @@
     }
 
     const list = [...found].map(([el, f]) => ({ el, name: describe(el) + (f.text ? ' (text)' : ''), left: Math.round(f.left), right: Math.round(f.right) }));
-    const outside = list.filter((f) => !found.has(f.el.parentElement)); // outermost only
+    const outside = list.filter((f) => !found.has(f.el.parentElement)); // فقط بیرونی‌ترین
 
-    // Containers whose content is wider than themselves, even if still on screen: a
-    // horizontal scrollbar (overflow auto/scroll), silently cut content (hidden/clip,
-    // including the html/body safety net), or content spilling out (visible).
-    // Skipped: single-line <input>/<select>, which by design scroll their own text.
+    // ظرف‌هایی که محتوایشان از خودشان پهن‌تر است، حتی اگر هنوز داخل صفحه باشند.
+    // استثنا: <input>/<select> تک‌خطی که متن خودشان را ذاتاً داخل خودشان اسکرول می‌کنند.
     const wider = [];
     for (const el of [document.documentElement, document.body, ...document.body.querySelectorAll('*')]) {
       if (el.matches('input, select, template, script, style') || !el.clientWidth || !visible(el)) continue;
@@ -106,7 +103,7 @@
 
   function report(force) {
     const offenders = scan();
-    observer.disconnect(); // our own class changes must not trigger another scan
+    observer.disconnect(); // تغییر کلاس‌های خودمان نباید بررسی تازه راه بیندازد
     for (const el of document.querySelectorAll('.' + MARK)) el.classList.remove(MARK);
     for (const o of offenders) o.el.classList.add(MARK);
     observer.takeRecords();
@@ -119,9 +116,9 @@
     if (signature === lastSignature && !force) return offenders;
     lastSignature = signature;
     if (!offenders.length) {
-      console.info('[overflow] OK: nothing past the viewport at width', document.documentElement.clientWidth);
+      console.info('[overflow] OK: no horizontal overflow at width', document.documentElement.clientWidth);
     } else {
-      console.group(`[overflow] ${offenders.length} element(s) past the viewport at width ${document.documentElement.clientWidth}`);
+      console.group(`[overflow] ${offenders.length} horizontal overflow problem(s) at width ${document.documentElement.clientWidth}`);
       for (const o of offenders) {
         const sides = o.excess ? `${o.excess}px wider than its box`
           : [o.left && `left +${o.left}px`, o.right && `right +${o.right}px`].filter(Boolean).join(', ');
@@ -149,10 +146,10 @@
   observe();
   window.addEventListener('resize', schedule);
   document.addEventListener('transitionend', schedule, true);
-  document.addEventListener('toggle', schedule, true); // <details> and popovers
+  document.addEventListener('toggle', schedule, true); // <details> و popover
   badge.addEventListener('click', () => report(true));
 
-  // For tests and the console: __overflowDebug.scan() -> current offenders.
+  // برای تست‌ها و Console: __overflowDebug.scan() ← فهرست فعلی مشکل‌ها.
   window.__overflowDebug = { scan: () => report(true).map(({ name, left, right, excess }) => ({ name, left, right, excess })) };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule);

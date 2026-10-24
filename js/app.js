@@ -1,4 +1,5 @@
-// Rendering and UI events. All data changes go through Store, then render() redraws the board.
+// رابط کاربری: ساخت برد، رندر و رویدادها. هر تغییر داده فقط از Store می‌گذرد و بعد
+// render() کل برد را از نو می‌کشد.
 
 const board = document.getElementById('board');
 const tabs = document.getElementById('tabs');
@@ -6,18 +7,18 @@ const cardTemplate = document.getElementById('cardTemplate');
 const dialog = document.getElementById('customerDialog');
 const form = document.getElementById('customerForm');
 
-// Must match the breakpoint in styles.css where columns turn into tabs.
+// باید با breakpoint نمای تبی در styles.css یکی باشد.
 const tabbedQuery = window.matchMedia('(max-width: 1199.98px)');
 
-// Remembered per browser; a convenience only, so storage errors are ignored.
+// تب فعال در همین مرورگر به خاطر سپرده می‌شود؛ فقط یک راحتی است، پس خطای ذخیره نادیده گرفته می‌شود.
 const ACTIVE_TAB_KEY = 'miniCrm.activeTab';
 let activeStatus = 'new';
 try {
   const saved = localStorage.getItem(ACTIVE_TAB_KEY);
   if (STATUSES.some((s) => s.id === saved)) activeStatus = saved;
-} catch (e) { /* ignore */ }
+} catch (e) { /* نادیده */ }
 
-// ---------- Board ----------
+// ---------- برد، ستون‌ها و تب‌ها ----------
 
 function buildBoard() {
   for (const s of STATUSES) {
@@ -43,7 +44,7 @@ function buildBoard() {
     tab.append(tabLabel, tabCount);
     tab.addEventListener('click', () => setActiveTab(s.id));
     tabs.append(tab);
-    attachDropTarget(tab); // dropping a dragged card on a tab moves it there
+    attachDropTarget(tab); // رها کردن کارت روی تب هم آن را منتقل می‌کند
 
     const head = document.createElement('header');
     head.className = 'column-head';
@@ -62,17 +63,15 @@ function buildBoard() {
   }
 }
 
-const FOLLOW_UP_FLAGS = { overdue: 'عقب‌افتاده', today: 'امروز' };
-
 function setActiveTab(status) {
   activeStatus = status;
   try {
     localStorage.setItem(ACTIVE_TAB_KEY, status);
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* نادیده */ }
   updateTabs();
 }
 
-// Only the active column is shown on mobile (via CSS); desktop ignores .active.
+// در نمای تبی فقط ستون فعال دیده می‌شود (با CSS)؛ در نمای ستونی کلاس active اثری ندارد.
 function updateTabs() {
   for (const tab of tabs.children) {
     const on = tab.dataset.status === activeStatus;
@@ -82,7 +81,7 @@ function updateTabs() {
   for (const col of board.children) col.classList.toggle('active', col.dataset.status === activeStatus);
 }
 
-// ---------- Toast ----------
+// ---------- پیام کوتاه پایین صفحه ----------
 
 const toast = document.getElementById('toast');
 let toastTimer;
@@ -94,7 +93,37 @@ function showToast(message) {
   toastTimer = setTimeout(() => { toast.hidden = true; }, 2500);
 }
 
-// Date the customer entered their current column (notes don't count).
+// ---------- جابه‌جایی ----------
+
+// هر دو راه جابه‌جایی (منو و کشیدن) از این‌جا می‌گذرند؛ ثبت در تاریخچه با Store.move است.
+function moveTo(id, to) {
+  if (!Store.move(id, to)) return;
+  render();
+  // در نمای تبی کارت از تب فعلی بیرون می‌رود؛ پس می‌گوییم کجا رفت.
+  if (tabbedQuery.matches) showToast(`«${Store.find(id).name}» به «${labelOf(STATUSES, to)}» منتقل شد.`);
+}
+
+function attachDropTarget(target) {
+  target.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    target.classList.add('drop-target');
+  });
+  target.addEventListener('dragleave', (e) => {
+    if (!target.contains(e.relatedTarget)) target.classList.remove('drop-target');
+  });
+  target.addEventListener('drop', (e) => {
+    e.preventDefault();
+    target.classList.remove('drop-target');
+    moveTo(e.dataTransfer.getData('text/plain'), target.dataset.status);
+  });
+}
+
+// ---------- کارت ----------
+
+const FOLLOW_UP_FLAGS = { overdue: 'عقب‌افتاده', today: 'امروز' };
+
+// زمان ورود به ستون فعلی (یادداشت‌ها حساب نمی‌شوند).
 function enteredStatusAt(c) {
   return c.history.filter((h) => h.to).at(-1).at;
 }
@@ -115,6 +144,7 @@ function renderCard(c, today) {
     followUp.remove();
   }
 
+  // متن کاربر فقط با textContent نوشته می‌شود، نه innerHTML.
   card.querySelector('.card-name').textContent = c.name;
   card.querySelector('.card-phone').textContent = formatPhone(c.phone);
   card.querySelector('.card-car').textContent = c.car || '—';
@@ -122,7 +152,7 @@ function renderCard(c, today) {
   card.querySelector('.card-source').textContent = labelOf(SOURCES, c.source);
   card.querySelector('.card-since').textContent = 'در این مرحله از ' + formatDateTime(enteredStatusAt(c));
 
-  // Clicking the card (not its controls) opens the details window.
+  // کلیک روی خود کارت (نه دکمه‌ها و منو) پنجره‌ی جزئیات را باز می‌کند.
   card.addEventListener('click', (e) => {
     if (!e.target.closest('button, select')) openDetails(c);
   });
@@ -136,11 +166,7 @@ function renderCard(c, today) {
     if (s.id !== c.status) select.append(new Option(s.label, s.id));
   }
   select.addEventListener('change', () => {
-    const to = select.value;
-    if (!to || !Store.move(c.id, to)) return;
-    render();
-    // In the tabbed view the card leaves the visible tab, so say where it went.
-    if (tabbedQuery.matches) showToast(`«${c.name}» به «${labelOf(STATUSES, to)}» منتقل شد.`);
+    if (select.value) moveTo(c.id, select.value);
   });
 
   card.querySelector('.edit-btn').addEventListener('click', () => openForm(c));
@@ -161,7 +187,7 @@ function renderCard(c, today) {
   return card;
 }
 
-// ---------- Summary bar ----------
+// ---------- نوار خلاصه ----------
 
 function renderSummary(today) {
   const s = computeStats(Store.all(), STATUSES.map((x) => x.id), today);
@@ -190,10 +216,12 @@ function renderSummary(today) {
   }));
 }
 
-// ---------- Details window ----------
+// ---------- پنجره‌ی جزئیات و تایم‌لاین ----------
 
 const detailDialog = document.getElementById('detailDialog');
+const noteForm = document.getElementById('noteForm');
 
+// «از جدید به تماس گرفته شد — ۱۴۰۵/۰۸/۰۲ ساعت ۱۰:۳۰»
 function timelineText(h) {
   if (h.type === 'created') return `ثبت مشتری در ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
   if (h.type === 'note') return `یادداشت: ${h.text} — ${formatDateTime(h.at)}`;
@@ -220,11 +248,11 @@ function openDetails(c) {
     dt.textContent = k;
     const dd = document.createElement('dd');
     dd.textContent = v;
-    if (k === 'موبایل') dd.dir = 'ltr'; // keep "۰۹۱۲ ۷۷۷ ۸۸۹۹" from being reordered in RTL
+    if (k === 'موبایل') dd.dir = 'ltr'; // تا «۰۹۱۲ ۷۷۷ ۸۸۹۹» در متن راست‌چین جابه‌جا نشود
     return [dt, dd];
   }));
 
-  // Newest first.
+  // جدیدترین رکورد بالا.
   detailDialog.querySelector('.timeline').replaceChildren(...[...c.history].reverse().map((h) => {
     const li = document.createElement('li');
     if (h.type === 'note') li.className = 'note';
@@ -239,14 +267,13 @@ function openDetails(c) {
   }
 }
 
-const noteForm = document.getElementById('noteForm');
 noteForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const id = detailDialog.dataset.id;
   if (Store.addNote(id, noteForm.elements.text.value)) {
     noteForm.reset();
     render();
-    openDetails(Store.find(id)); // refresh the open timeline
+    openDetails(Store.find(id)); // تایم‌لاینِ پنجره‌ی باز به‌روز شود
   }
 });
 
@@ -255,14 +282,14 @@ document.getElementById('detailEdit').addEventListener('click', () => {
   detailDialog.close();
   openForm(Store.find(detailDialog.dataset.id));
 });
-// Close on backdrop click (click lands on the dialog element but outside its box).
+// کلیک روی پس‌زمینه (بیرون از کادر پنجره) آن را می‌بندد.
 detailDialog.addEventListener('click', (e) => {
   const r = detailDialog.getBoundingClientRect();
   const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
   if (e.target === detailDialog && !inside) detailDialog.close();
 });
 
-// ---------- Search & filter ----------
+// ---------- جستجو و فیلتر ----------
 
 const searchInput = document.getElementById('search');
 const onlyOverdue = document.getElementById('onlyOverdue');
@@ -273,7 +300,7 @@ function isFiltering() {
   return searchInput.value.trim() !== '' || onlyOverdue.checked;
 }
 
-// ---------- Render ----------
+// ---------- رندر ----------
 
 let renderedForDay = null;
 
@@ -297,7 +324,7 @@ function render() {
   const all = Store.all();
   const filtering = isFiltering();
 
-  // Newest arrivals in a column first.
+  // در هر ستون، تازه‌ترین ورود بالا.
   const customers = [...all]
     .filter((c) => matchesSearch(c, searchInput.value))
     .filter((c) => !onlyOverdue.checked || followUpState(c, today) === 'overdue')
@@ -307,7 +334,7 @@ function render() {
     const status = col.dataset.status;
     const inCol = customers.filter((c) => c.status === status);
     const totalInCol = all.filter((c) => c.status === status).length;
-    // While filtering, show "visible of total" so the count isn't mistaken for the real total.
+    // هنگام فیلتر «۲ از ۵» تا تعداد دیده‌شده با تعداد واقعی اشتباه نشود.
     const countText = filtering
       ? `${toFaDigits(inCol.length)} از ${toFaDigits(totalInCol)}`
       : toFaDigits(inCol.length);
@@ -327,31 +354,12 @@ function render() {
   updateTabs();
 }
 
-// Re-render after midnight so "today"/"overdue" flags stay correct on a page left open.
+// اگر صفحه از نیمه‌شب گذشت و باز ماند، برچسب‌های «امروز» و «عقب‌افتاده» به‌روز شوند.
 setInterval(() => {
   if (todayYmd() !== renderedForDay) render();
 }, 60000);
 
-// ---------- Drag & drop ----------
-
-function attachDropTarget(col) {
-  col.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    col.classList.add('drop-target');
-  });
-  col.addEventListener('dragleave', (e) => {
-    if (!col.contains(e.relatedTarget)) col.classList.remove('drop-target');
-  });
-  col.addEventListener('drop', (e) => {
-    e.preventDefault();
-    col.classList.remove('drop-target');
-    const id = e.dataTransfer.getData('text/plain');
-    if (Store.move(id, col.dataset.status)) render();
-  });
-}
-
-// ---------- Form ----------
+// ---------- فرم افزودن/ویرایش ----------
 
 const sourceSelect = form.elements.source;
 for (const s of SOURCES) sourceSelect.append(new Option(s.label, s.id));
@@ -381,8 +389,8 @@ function openForm(customer) {
   f.name.focus();
 }
 
-// Re-format budget with thousands separators while typing, keeping the caret
-// after the same number of digits (otherwise it jumps to the end on every keystroke).
+// بودجه هنگام تایپ با جداکننده‌ی سه‌رقمی و ارقام فارسی بازنویسی می‌شود؛ مکان‌نما بعد از همان
+// تعداد رقم می‌ماند (وگرنه با هر کلید به آخر می‌پرد).
 form.elements.budget.addEventListener('input', (e) => {
   const input = e.target;
   const digitsBeforeCaret = toLatinDigits(input.value.slice(0, input.selectionStart)).replace(/\D/g, '').length;
@@ -395,7 +403,7 @@ form.elements.budget.addEventListener('input', (e) => {
   input.setSelectionRange(pos, pos);
 });
 
-// The native picker shows the browser's calendar; show the Jalali date next to it.
+// انتخابگر تاریخ مال مرورگر است و تقویم میلادی نشان می‌دهد؛ معادل شمسی زیرش نوشته می‌شود.
 function updateFollowUpHint() {
   const v = form.elements.followUp.value;
   document.getElementById('followUpHint').textContent = v ? 'شمسی: ' + formatYmd(v) : '';
@@ -407,9 +415,9 @@ form.addEventListener('submit', (e) => {
   const f = form.elements;
   const name = f.name.value.trim().slice(0, f.name.maxLength);
   const phone = normalizePhone(f.phone.value);
-
   const duplicate = phone && Store.findByPhone(phone, f.id.value);
 
+  // اعتبارسنجی: نام (حداقل ۲ حرف) و موبایل معتبر اجباری‌اند؛ شماره‌ی تکراری پذیرفته نمی‌شود.
   setError('name', name.length >= 2 ? '' : 'نام را وارد کنید (حداقل ۲ حرف).');
   setError('phone', !phone ? 'شماره موبایل معتبر نیست (مثل ۰۹۱۲۱۲۳۴۵۶۷).'
     : duplicate ? `این شماره قبلاً برای «${duplicate.name}» ثبت شده است.` : '');
