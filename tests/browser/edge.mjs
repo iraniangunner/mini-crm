@@ -102,6 +102,8 @@ r = await ev(`parseBudget('۰۰۰۵') + ',' + parseBudget('0')`);
 check('budget leading zeros', r === '5,0', r);
 
 // --- layout at 375px ---
+// Layer 1 must hold on its own: measure with the html/body clip (layer 3) disabled.
+await ev(`document.head.insertAdjacentHTML('beforeend', '<style id="noclip">html, body { overflow-x: visible !important; }</style>')`);
 for (const w of [375, 320]) {
   await width(w);
   const sw = await ev(`document.documentElement.scrollWidth`);

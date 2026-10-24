@@ -166,6 +166,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 900, devi
 await sleep(300);
 const shot2 = await send('Page.captureScreenshot', { format: 'png' });
 writeFileSync(join(OUT, 'mobile.png'), Buffer.from(shot2.result.data, 'base64'));
+await ev(`document.head.insertAdjacentHTML('beforeend', '<style id="noclip">html, body { overflow-x: visible !important; }</style>')`); // layer 1 alone
 check('no horizontal scroll on mobile', await ev(`document.documentElement.scrollWidth <= 390`), await ev(`document.documentElement.scrollWidth + ' vs 390'`));
 
 check('no console errors/warnings', errors.length === 0, errors.join(' ; '));
