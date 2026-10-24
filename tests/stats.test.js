@@ -1,5 +1,15 @@
 // Run with: node tests/stats.test.js
-const { avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA } = require('../js/stats.js');
+// Loads the browser scripts into one shared context, the same way <script> tags share globals.
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const ctx = vm.createContext({ Intl });
+for (const file of ['utils.js', 'stats.js']) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8'), ctx, { filename: file });
+}
+const { avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch } =
+  vm.runInContext('({ avgDaysToPurchase, computeStats, formatAvgDays, formatRate, NO_DATA, followUpState, matchesSearch })', ctx);
 
 const STATUS_IDS = ['new', 'contacted', 'test_drive', 'purchased', 'cancelled'];
 const T0 = Date.parse('2026-10-01T10:00:00Z');
@@ -75,10 +85,61 @@ function testAverage() {
     { name: 'no data text', ok: formatAvgDays(null) === NO_DATA && formatRate(computeStats([], STATUS_IDS).conversionRate) === NO_DATA, detail: formatAvgDays(null) },
   );
 
+  return checks;
+}
+
+function testFollowUpAndSearch() {
+  const today = '2026-10-24';
+  const fu = (status, followUp) => ({
+    ...customer(['new', 0], ...(status === 'new' ? [] : [[status, 1]])),
+    followUp,
+  });
+  const checks = [
+    ['yesterday, open -> overdue', followUpState(fu('contacted', '2026-10-23'), today), 'overdue'],
+    ['last year, open -> overdue', followUpState(fu('new', '2025-12-31'), today), 'overdue'],
+    ['today -> today', followUpState(fu('test_drive', '2026-10-24'), today), 'today'],
+    ['tomorrow -> nothing', followUpState(fu('new', '2026-10-25'), today), null],
+    ['no date -> nothing', followUpState(fu('new', null), today), null],
+    ['purchased + past -> not overdue', followUpState(fu('purchased', '2026-10-01'), today), null],
+    ['cancelled + past -> not overdue', followUpState(fu('cancelled', '2026-10-01'), today), null],
+    ['purchased + today -> no flag', followUpState(fu('purchased', today), today), null],
+  ].map(([name, got, expected]) => ({ name, ok: got === expected, detail: `expected ${expected}, got ${got}` }));
+
+  const s = computeStats([
+    fu('new', '2026-10-20'), fu('contacted', '2026-10-23'), fu('test_drive', today),
+    fu('purchased', '2026-10-01'), fu('cancelled', '2026-10-01'), fu('new', null),
+  ], STATUS_IDS, today);
+  checks.push({ name: 'overdue count = 2 (closed excluded)', ok: s.overdue === 2, detail: `got ${s.overdue}` });
+
+  const c = { name: 'مریم احمدی', phone: '09351112233' };
+  const search = [
+    ['empty query matches all', '', true],
+    ['part of name', 'مریم', true],
+    ['Arabic ي in query', 'مريم', true],
+    ['extra spaces', ' مریم   احمدی ', true],
+    ['ZWNJ instead of space', 'مریم‌احمدی', true],
+    ['Latin digits', '0935111', true],
+    ['Persian digits', '۰۹۳۵۱۱۱', true],
+    ['Arabic-Indic digits', '٠٩٣٥', true],
+    ['digits with spaces/dashes', '۰۹۳۵ ۱۱۱-۲۲', true],
+    ['middle of number', '2233', true],
+    ['+98 prefix', '+98 935 111', true],
+    ['0098 prefix', '0098935', true],
+    ['wrong number', '0912', false],
+    ['wrong name', 'علی', false],
+    ['letters + digits mix not treated as phone', 'a0935', false],
+  ].map(([name, q, expected]) => {
+    const got = matchesSearch(c, q);
+    return { name: `search: ${name} (${JSON.stringify(q)})`, ok: got === expected, detail: `expected ${expected}, got ${got}` };
+  });
+  return checks.concat(search);
+}
+
+function report(checks) {
   for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name}${c.ok ? '' : '  -> ' + c.detail}`);
   const failed = checks.filter((c) => !c.ok).length;
   console.log(failed ? `\n${failed} of ${checks.length} FAILED` : `\nall ${checks.length} passed`);
   return failed === 0;
 }
 
-process.exitCode = testAverage() ? 0 : 1;
+process.exitCode = report([...testAverage(), ...testFollowUpAndSearch()]) ? 0 : 1;

@@ -6,6 +6,7 @@
   --border: #e2e5ea;
   --primary: #2563eb;
   --danger: #dc2626;
+  --today: #ea580c;
   --drop: #dbeafe;
   --col-new: #64748b;
   --col-contacted: #0891b2;
@@ -164,6 +165,41 @@ body {
 .card-since { color: var(--muted); font-size: .8rem; }
 .card { cursor: pointer; }
 .card:hover, .card:focus-visible { border-color: var(--primary); outline: none; }
+.card-followup { font-size: .85rem; margin-bottom: 2px; }
+.flag:empty { display: none; }
+.flag { color: #fff; border-radius: 999px; padding: 0 8px; font-size: .75rem; font-weight: bold; }
+.card.overdue { border: 2px solid var(--danger); background: #fef2f2; box-shadow: 0 0 0 3px rgba(220, 38, 38, .15); }
+.card.overdue .flag { background: var(--danger); }
+.card.overdue .followup-date { color: var(--danger); font-weight: bold; }
+.card.today { border: 2px solid var(--today); background: #fff7ed; }
+.card.today .flag { background: var(--today); }
+.card.today .followup-date { color: var(--today); font-weight: bold; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px 0; }
+.toolbar input[type="search"] {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.stat[data-key="overdue"] { border-color: var(--danger); }
+.stat[data-key="overdue"] .stat-value { color: var(--danger); }
+.hint { color: var(--muted); }
+
+.note-form { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+.note-form textarea {
+  font: inherit;
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+}
+.timeline li.note { color: var(--muted); font-style: italic; }
+.timeline li.note::before { background: var(--surface); border: 2px solid var(--primary); width: 8px; height: 8px; }
 .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .move-select { font: inherit; font-size: .85rem; flex: 1 1 100%; padding: 2px 4px; }
 

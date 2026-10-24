@@ -65,11 +65,32 @@ function formatBudget(n) {
 const dateFmt = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 const timeFmt = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
-// "۱۴۰۵/۰۸/۰۲ ساعت ۱۰:۳۰" (Jalali). Built from parts so separators don't depend on the browser.
+// "۱۴۰۵/۰۸/۰۲" (Jalali). Built from parts so separators don't depend on the browser.
+function jalaliDate(d) {
+  const p = Object.fromEntries(dateFmt.formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.year}/${p.month}/${p.day}`;
+}
+
+// "۱۴۰۵/۰۸/۰۲ ساعت ۱۰:۳۰"
 function formatDateTime(iso) {
   const d = new Date(iso);
-  const p = Object.fromEntries(dateFmt.formatToParts(d).map((x) => [x.type, x.value]));
-  return `${p.year}/${p.month}/${p.day} ساعت ${timeFmt.format(d)}`;
+  return `${jalaliDate(d)} ساعت ${timeFmt.format(d)}`;
+}
+
+// Local calendar dates as "YYYY-MM-DD" (the <input type="date"> value format).
+function toYmd(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function todayYmd() {
+  return toYmd(new Date());
+}
+
+// "2026-10-27" -> "۱۴۰۵/۰۸/۰۵". Parsed as a local date, not UTC.
+function formatYmd(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return jalaliDate(new Date(y, m - 1, d));
 }
 
 function uid() {

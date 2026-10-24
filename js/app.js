@@ -31,14 +31,29 @@ function buildBoard() {
   }
 }
 
-// Date the customer entered their current column.
+const FOLLOW_UP_FLAGS = { overdue: 'عقب‌افتاده', today: 'امروز' };
+
+// Date the customer entered their current column (notes don't count).
 function enteredStatusAt(c) {
-  return c.history[c.history.length - 1].at;
+  return c.history.filter((h) => h.to).at(-1).at;
 }
 
-function renderCard(c) {
+function renderCard(c, today) {
   const card = cardTemplate.content.firstElementChild.cloneNode(true);
   card.dataset.id = c.id;
+
+  const state = followUpState(c, today);
+  const followUp = card.querySelector('.card-followup');
+  if (c.followUp) {
+    followUp.querySelector('.followup-date').textContent = 'پیگیری: ' + formatYmd(c.followUp);
+    if (state) {
+      card.classList.add(state);
+      followUp.querySelector('.flag').textContent = FOLLOW_UP_FLAGS[state];
+    }
+  } else {
+    followUp.remove();
+  }
+
   card.querySelector('.card-name').textContent = c.name;
   card.querySelector('.card-phone').textContent = formatPhone(c.phone);
   card.querySelector('.card-car').textContent = c.car || '—';
@@ -83,13 +98,14 @@ function renderCard(c) {
 
 // ---------- Summary bar ----------
 
-function renderSummary() {
-  const s = computeStats(Store.all(), STATUSES.map((x) => x.id));
+function renderSummary(today) {
+  const s = computeStats(Store.all(), STATUSES.map((x) => x.id), today);
   const items = [
     ['کل مشتری‌ها', toFaDigits(s.total), 'total'],
     ...STATUSES.map((x) => [x.label, toFaDigits(s.byStatus[x.id]), x.id]),
     ['نرخ تبدیل (خرید از کل)', formatRate(s.conversionRate), 'rate'],
     ['میانگین روزهای جدید تا خرید', formatAvgDays(s.avgDays), 'avg'],
+    ['پیگیری عقب‌افتاده', toFaDigits(s.overdue), 'overdue'],
   ];
   const summary = document.getElementById('summary');
   summary.replaceChildren(...items.map(([label, value, key]) => {
@@ -112,12 +128,13 @@ function renderSummary() {
 const detailDialog = document.getElementById('detailDialog');
 
 function timelineText(h) {
-  return h.type === 'created'
-    ? `ثبت مشتری در ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`
-    : `از ${labelOf(STATUSES, h.from)} به ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
+  if (h.type === 'created') return `ثبت مشتری در ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
+  if (h.type === 'note') return `یادداشت: ${h.text} — ${formatDateTime(h.at)}`;
+  return `از ${labelOf(STATUSES, h.from)} به ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
 }
 
 function openDetails(c) {
+  detailDialog.dataset.id = c.id;
   detailDialog.querySelector('.detail-name').textContent = c.name;
   const badge = detailDialog.querySelector('.detail-status');
   badge.textContent = labelOf(STATUSES, c.status);
@@ -128,6 +145,7 @@ function openDetails(c) {
     ['خودروی مورد علاقه', c.car || '—'],
     ['بودجه', formatBudget(c.budget)],
     ['منبع آشنایی', labelOf(SOURCES, c.source)],
+    ['پیگیری بعدی', c.followUp ? formatYmd(c.followUp) : '—'],
     ['تاریخ ثبت', formatDateTime(c.createdAt)],
   ];
   detailDialog.querySelector('.detail-info').replaceChildren(...info.flatMap(([k, v]) => {
@@ -142,13 +160,28 @@ function openDetails(c) {
   // Newest first.
   detailDialog.querySelector('.timeline').replaceChildren(...[...c.history].reverse().map((h) => {
     const li = document.createElement('li');
-    li.style.setProperty('--col-color', `var(--col-${h.to})`);
+    if (h.type === 'note') li.className = 'note';
+    else li.style.setProperty('--col-color', `var(--col-${h.to})`);
     li.textContent = timelineText(h);
     return li;
   }));
 
-  detailDialog.showModal();
+  if (!detailDialog.open) {
+    noteForm.reset();
+    detailDialog.showModal();
+  }
 }
+
+const noteForm = document.getElementById('noteForm');
+noteForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const id = detailDialog.dataset.id;
+  if (Store.addNote(id, noteForm.elements.text.value)) {
+    noteForm.reset();
+    render();
+    openDetails(Store.find(id)); // refresh the open timeline
+  }
+});
 
 document.getElementById('detailClose').addEventListener('click', () => detailDialog.close());
 // Close on backdrop click (click lands on the dialog element but outside its box).
@@ -158,24 +191,50 @@ detailDialog.addEventListener('click', (e) => {
   if (e.target === detailDialog && !inside) detailDialog.close();
 });
 
+// ---------- Search & filter ----------
+
+const searchInput = document.getElementById('search');
+const onlyOverdue = document.getElementById('onlyOverdue');
+searchInput.addEventListener('input', () => render());
+onlyOverdue.addEventListener('change', () => render());
+
+function isFiltering() {
+  return searchInput.value.trim() !== '' || onlyOverdue.checked;
+}
+
+// ---------- Render ----------
+
+let renderedForDay = null;
+
 function render() {
-  renderSummary();
+  const today = todayYmd();
+  renderedForDay = today;
+  renderSummary(today);
+
   // Newest arrivals in a column first.
-  const customers = [...Store.all()].sort((a, b) => enteredStatusAt(b).localeCompare(enteredStatusAt(a)));
+  const customers = [...Store.all()]
+    .filter((c) => matchesSearch(c, searchInput.value))
+    .filter((c) => !onlyOverdue.checked || followUpState(c, today) === 'overdue')
+    .sort((a, b) => enteredStatusAt(b).localeCompare(enteredStatusAt(a)));
 
   for (const col of board.querySelectorAll('.column')) {
     const inCol = customers.filter((c) => c.status === col.dataset.status);
     col.querySelector('.count').textContent = toFaDigits(inCol.length);
     const body = col.querySelector('.column-body');
-    body.replaceChildren(...inCol.map(renderCard));
+    body.replaceChildren(...inCol.map((c) => renderCard(c, today)));
     if (!inCol.length) {
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.textContent = 'مشتری‌ای نیست';
+      empty.textContent = isFiltering() ? 'نتیجه‌ای نیست' : 'مشتری‌ای نیست';
       body.append(empty);
     }
   }
 }
+
+// Re-render after midnight so "today"/"overdue" flags stay correct on a page left open.
+setInterval(() => {
+  if (todayYmd() !== renderedForDay) render();
+}, 60000);
 
 // ---------- Drag & drop ----------
 
@@ -219,7 +278,9 @@ function openForm(customer) {
     f.car.value = customer.car;
     f.budget.value = customer.budget == null ? '' : formatNumber(customer.budget);
     f.source.value = customer.source;
+    f.followUp.value = customer.followUp || '';
   }
+  updateFollowUpHint();
   dialog.showModal();
   f.name.focus();
 }
@@ -229,6 +290,13 @@ form.elements.budget.addEventListener('input', (e) => {
   const n = parseBudget(e.target.value);
   e.target.value = n == null ? '' : formatNumber(n);
 });
+
+// The native picker shows the browser's calendar; show the Jalali date next to it.
+function updateFollowUpHint() {
+  const v = form.elements.followUp.value;
+  document.getElementById('followUpHint').textContent = v ? 'شمسی: ' + formatYmd(v) : '';
+}
+form.elements.followUp.addEventListener('input', updateFollowUpHint);
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -247,6 +315,7 @@ form.addEventListener('submit', (e) => {
     car: f.car.value.trim(),
     budget: parseBudget(f.budget.value),
     source: f.source.value,
+    followUp: f.followUp.value || null,
   };
   if (f.id.value) Store.update(f.id.value, fields);
   else Store.create(fields);

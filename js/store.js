@@ -79,6 +79,15 @@ const Store = (() => {
       return true;
     },
 
+    addNote(id, text) {
+      const c = find(id);
+      const trimmed = text.trim();
+      if (!c || !trimmed) return false;
+      c.history.push({ type: 'note', text: trimmed, at: new Date().toISOString() });
+      save();
+      return true;
+    },
+
     resetSample() {
       data = buildSampleData();
       save();

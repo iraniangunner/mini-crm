@@ -17,6 +17,11 @@
 
   <section id="summary" class="summary" aria-label="خلاصه"></section>
 
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="جستجوی نام یا شماره..." aria-label="جستجو">
+    <label class="check"><input id="onlyOverdue" type="checkbox"> فقط عقب‌افتاده‌ها</label>
+  </section>
+
   <main id="board" class="board" aria-label="ستون‌های مشتری"></main>
 
   <dialog id="detailDialog" class="detail">
@@ -26,6 +31,10 @@
     </header>
     <dl class="detail-info"></dl>
     <h3>تاریخچه</h3>
+    <form id="noteForm" class="note-form">
+      <textarea name="text" rows="2" maxlength="200" placeholder="یادداشت تماس (حداکثر ۲۰۰ نویسه)..." aria-label="یادداشت"></textarea>
+      <button type="submit" class="btn small primary">افزودن یادداشت</button>
+    </form>
     <ol class="timeline"></ol>
     <div class="form-actions">
       <button type="button" class="btn" id="detailClose">بستن</button>
@@ -64,6 +73,12 @@
         <select name="source"></select>
       </label>
 
+      <label class="field">
+        <span>تاریخ پیگیری بعدی</span>
+        <input name="followUp" type="date">
+        <small class="hint" id="followUpHint"></small>
+      </label>
+
       <div class="form-actions">
         <button type="submit" class="btn primary">ذخیره</button>
         <button type="button" class="btn" id="cancelBtn">انصراف</button>
@@ -80,6 +95,7 @@
         <dt>بودجه</dt><dd class="card-budget"></dd>
         <dt>منبع</dt><dd class="card-source"></dd>
       </dl>
+      <div class="card-followup"><span class="followup-date"></span> <span class="flag"></span></div>
       <div class="card-since"></div>
       <div class="card-actions">
         <select class="move-select" aria-label="انتقال به"></select>
