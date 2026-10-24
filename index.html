@@ -15,6 +15,11 @@
     </div>
   </header>
 
+  <div id="notice" class="notice" role="alert" hidden>
+    <span class="notice-text"></span>
+    <button type="button" class="btn small" id="noticeClose">باشه</button>
+  </div>
+
   <section id="summary" class="summary" aria-label="خلاصه"></section>
 
   <section class="toolbar">
@@ -22,7 +27,12 @@
     <label class="check"><input id="onlyOverdue" type="checkbox"> فقط عقب‌افتاده‌ها</label>
   </section>
 
+  <!-- Mobile (< 768px) only: one tab per status; desktop shows all columns instead. -->
+  <nav id="tabs" class="tabs" role="tablist" aria-label="وضعیت‌ها"></nav>
+
   <main id="board" class="board" aria-label="ستون‌های مشتری"></main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <dialog id="detailDialog" class="detail">
     <header class="detail-head">
@@ -37,6 +47,7 @@
     </form>
     <ol class="timeline"></ol>
     <div class="form-actions">
+      <button type="button" class="btn primary" id="detailEdit">ویرایش مشخصات</button>
       <button type="button" class="btn" id="detailClose">بستن</button>
     </div>
   </dialog>
@@ -48,7 +59,7 @@
 
       <label class="field">
         <span>نام و نام خانوادگی <b class="req">*</b></span>
-        <input name="name" type="text" autocomplete="name">
+        <input name="name" type="text" autocomplete="name" maxlength="60">
         <small class="error" data-error-for="name"></small>
       </label>
 
@@ -60,12 +71,12 @@
 
       <label class="field">
         <span>خودروی مورد علاقه</span>
-        <input name="car" type="text">
+        <input name="car" type="text" maxlength="60">
       </label>
 
       <label class="field">
         <span>بودجه (تومان)</span>
-        <input name="budget" type="text" inputmode="numeric" dir="ltr">
+        <input name="budget" type="text" inputmode="numeric" dir="ltr" placeholder="۲٬۵۰۰٬۰۰۰٬۰۰۰">
       </label>
 
       <label class="field">
@@ -81,7 +92,7 @@
 
       <div class="form-actions">
         <button type="submit" class="btn primary">ذخیره</button>
-        <button type="button" class="btn" id="cancelBtn">انصراف</button>
+        <button type="button" class="btn" id="cancelBtn">لغو</button>
       </div>
     </form>
   </dialog>

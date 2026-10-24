@@ -1,9 +1,21 @@
 // Rendering and UI events. All data changes go through Store, then render() redraws the board.
 
 const board = document.getElementById('board');
+const tabs = document.getElementById('tabs');
 const cardTemplate = document.getElementById('cardTemplate');
 const dialog = document.getElementById('customerDialog');
 const form = document.getElementById('customerForm');
+
+// Must match the breakpoint in styles.css where columns turn into tabs.
+const mobileQuery = window.matchMedia('(max-width: 767.98px)');
+
+// Remembered per browser; a convenience only, so storage errors are ignored.
+const ACTIVE_TAB_KEY = 'miniCrm.activeTab';
+let activeStatus = 'new';
+try {
+  const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+  if (STATUSES.some((s) => s.id === saved)) activeStatus = saved;
+} catch (e) { /* ignore */ }
 
 // ---------- Board ----------
 
@@ -11,8 +23,27 @@ function buildBoard() {
   for (const s of STATUSES) {
     const col = document.createElement('section');
     col.className = 'column';
+    col.id = `col-${s.id}`;
     col.dataset.status = s.id;
+    col.setAttribute('role', 'tabpanel');
     col.style.setProperty('--col-color', `var(--col-${s.id})`);
+
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'tab';
+    tab.dataset.status = s.id;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', col.id);
+    tab.style.setProperty('--col-color', `var(--col-${s.id})`);
+    const tabLabel = document.createElement('span');
+    tabLabel.className = 'tab-label';
+    tabLabel.textContent = s.label;
+    const tabCount = document.createElement('span');
+    tabCount.className = 'count';
+    tab.append(tabLabel, tabCount);
+    tab.addEventListener('click', () => setActiveTab(s.id));
+    tabs.append(tab);
+    attachDropTarget(tab); // dropping a dragged card on a tab moves it there
 
     const head = document.createElement('header');
     head.className = 'column-head';
@@ -32,6 +63,36 @@ function buildBoard() {
 }
 
 const FOLLOW_UP_FLAGS = { overdue: 'عقب‌افتاده', today: 'امروز' };
+
+function setActiveTab(status) {
+  activeStatus = status;
+  try {
+    localStorage.setItem(ACTIVE_TAB_KEY, status);
+  } catch (e) { /* ignore */ }
+  updateTabs();
+}
+
+// Only the active column is shown on mobile (via CSS); desktop ignores .active.
+function updateTabs() {
+  for (const tab of tabs.children) {
+    const on = tab.dataset.status === activeStatus;
+    tab.classList.toggle('active', on);
+    tab.setAttribute('aria-selected', String(on));
+  }
+  for (const col of board.children) col.classList.toggle('active', col.dataset.status === activeStatus);
+}
+
+// ---------- Toast ----------
+
+const toast = document.getElementById('toast');
+let toastTimer;
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 2500);
+}
 
 // Date the customer entered their current column (notes don't count).
 function enteredStatusAt(c) {
@@ -75,7 +136,11 @@ function renderCard(c, today) {
     if (s.id !== c.status) select.append(new Option(s.label, s.id));
   }
   select.addEventListener('change', () => {
-    if (select.value && Store.move(c.id, select.value)) render();
+    const to = select.value;
+    if (!to || !Store.move(c.id, to)) return;
+    render();
+    // On mobile the card leaves the visible tab, so say where it went.
+    if (mobileQuery.matches) showToast(`«${c.name}» به «${labelOf(STATUSES, to)}» منتقل شد.`);
   });
 
   card.querySelector('.edit-btn').addEventListener('click', () => openForm(c));
@@ -112,6 +177,8 @@ function renderSummary(today) {
     const box = document.createElement('div');
     box.className = 'stat';
     box.dataset.key = key;
+    if (STATUSES.some((x) => x.id === key)) box.style.setProperty('--col-color', `var(--col-${key})`);
+    if (value === NO_DATA) box.classList.add('no-data');
     const l = document.createElement('span');
     l.className = 'stat-label';
     l.textContent = label;
@@ -184,6 +251,10 @@ noteForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('detailClose').addEventListener('click', () => detailDialog.close());
+document.getElementById('detailEdit').addEventListener('click', () => {
+  detailDialog.close();
+  openForm(Store.find(detailDialog.dataset.id));
+});
 // Close on backdrop click (click lands on the dialog element but outside its box).
 detailDialog.addEventListener('click', (e) => {
   const r = detailDialog.getBoundingClientRect();
@@ -206,29 +277,54 @@ function isFiltering() {
 
 let renderedForDay = null;
 
+const noticeEl = document.getElementById('notice');
+document.getElementById('noticeClose').addEventListener('click', () => {
+  Store.dismissNotice();
+  noticeEl.hidden = true;
+});
+
+function renderNotice() {
+  const message = Store.notice();
+  noticeEl.hidden = !message;
+  noticeEl.querySelector('.notice-text').textContent = message || '';
+}
+
 function render() {
   const today = todayYmd();
   renderedForDay = today;
+  renderNotice();
   renderSummary(today);
+  const all = Store.all();
+  const filtering = isFiltering();
 
   // Newest arrivals in a column first.
-  const customers = [...Store.all()]
+  const customers = [...all]
     .filter((c) => matchesSearch(c, searchInput.value))
     .filter((c) => !onlyOverdue.checked || followUpState(c, today) === 'overdue')
     .sort((a, b) => enteredStatusAt(b).localeCompare(enteredStatusAt(a)));
 
   for (const col of board.querySelectorAll('.column')) {
-    const inCol = customers.filter((c) => c.status === col.dataset.status);
-    col.querySelector('.count').textContent = toFaDigits(inCol.length);
+    const status = col.dataset.status;
+    const inCol = customers.filter((c) => c.status === status);
+    const totalInCol = all.filter((c) => c.status === status).length;
+    // While filtering, show "visible of total" so the count isn't mistaken for the real total.
+    const countText = filtering
+      ? `${toFaDigits(inCol.length)} از ${toFaDigits(totalInCol)}`
+      : toFaDigits(inCol.length);
+    col.querySelector('.count').textContent = countText;
+    tabs.querySelector(`[data-status="${status}"] .count`).textContent = countText;
     const body = col.querySelector('.column-body');
     body.replaceChildren(...inCol.map((c) => renderCard(c, today)));
     if (!inCol.length) {
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.textContent = isFiltering() ? 'نتیجه‌ای نیست' : 'مشتری‌ای نیست';
+      if (filtering) empty.textContent = 'نتیجه‌ای نیست';
+      else if (!all.length && status === 'new') empty.textContent = 'هنوز مشتری‌ای ثبت نشده؛ با «+ مشتری جدید» شروع کنید.';
+      else empty.textContent = 'مشتری‌ای نیست';
       body.append(empty);
     }
   }
+  updateTabs();
 }
 
 // Re-render after midnight so "today"/"overdue" flags stay correct on a page left open.
@@ -275,7 +371,7 @@ function openForm(customer) {
   if (customer) {
     f.name.value = customer.name;
     f.phone.value = toFaDigits(customer.phone);
-    f.car.value = customer.car;
+    f.car.value = customer.car || '';
     f.budget.value = customer.budget == null ? '' : formatNumber(customer.budget);
     f.source.value = customer.source;
     f.followUp.value = customer.followUp || '';
@@ -285,10 +381,18 @@ function openForm(customer) {
   f.name.focus();
 }
 
-// Re-format budget with thousands separators while typing.
+// Re-format budget with thousands separators while typing, keeping the caret
+// after the same number of digits (otherwise it jumps to the end on every keystroke).
 form.elements.budget.addEventListener('input', (e) => {
-  const n = parseBudget(e.target.value);
-  e.target.value = n == null ? '' : formatNumber(n);
+  const input = e.target;
+  const digitsBeforeCaret = toLatinDigits(input.value.slice(0, input.selectionStart)).replace(/\D/g, '').length;
+  const n = parseBudget(input.value);
+  input.value = n == null ? '' : formatNumber(n);
+  let pos = 0;
+  for (let seen = 0; pos < input.value.length && seen < digitsBeforeCaret; pos++) {
+    if (/\d/.test(toLatinDigits(input.value[pos]))) seen++;
+  }
+  input.setSelectionRange(pos, pos);
 });
 
 // The native picker shows the browser's calendar; show the Jalali date next to it.
@@ -301,18 +405,21 @@ form.elements.followUp.addEventListener('input', updateFollowUpHint);
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   const f = form.elements;
-  const name = f.name.value.trim();
+  const name = f.name.value.trim().slice(0, f.name.maxLength);
   const phone = normalizePhone(f.phone.value);
 
+  const duplicate = phone && Store.findByPhone(phone, f.id.value);
+
   setError('name', name.length >= 2 ? '' : 'نام را وارد کنید (حداقل ۲ حرف).');
-  setError('phone', phone ? '' : 'شماره موبایل معتبر نیست (مثل ۰۹۱۲۱۲۳۴۵۶۷).');
+  setError('phone', !phone ? 'شماره موبایل معتبر نیست (مثل ۰۹۱۲۱۲۳۴۵۶۷).'
+    : duplicate ? `این شماره قبلاً برای «${duplicate.name}» ثبت شده است.` : '');
   if (name.length < 2) return f.name.focus();
-  if (!phone) return f.phone.focus();
+  if (!phone || duplicate) return f.phone.focus();
 
   const fields = {
     name,
     phone,
-    car: f.car.value.trim(),
+    car: f.car.value.trim().slice(0, f.car.maxLength),
     budget: parseBudget(f.budget.value),
     source: f.source.value,
     followUp: f.followUp.value || null,

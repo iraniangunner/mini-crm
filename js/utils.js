@@ -48,9 +48,12 @@ function formatPhone(phone) {
   return toFaDigits(phone.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1 $2 $3'));
 }
 
-// Digits-only parse of a budget field; null when empty.
+// Digits-only parse of a budget field; null when empty. Capped at 15 digits so the
+// number stays exact (Number.MAX_SAFE_INTEGER has 16).
+const BUDGET_MAX_DIGITS = 15;
+
 function parseBudget(input) {
-  const digits = toLatinDigits(input).replace(/\D/g, '');
+  const digits = toLatinDigits(input).replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, BUDGET_MAX_DIGITS);
   return digits ? Number(digits) : null;
 }
 
