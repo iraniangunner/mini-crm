@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مینی‌CRM نمایشگاه خودرو</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>مشتری‌های نمایشگاه</h1>
+    <div class="actions">
+      <button type="button" id="addBtn" class="btn primary">+ مشتری جدید</button>
+      <button type="button" id="resetBtn" class="btn">بازگردانی داده‌ی نمونه</button>
+    </div>
+  </header>
+
+  <main id="board" class="board" aria-label="ستون‌های مشتری"></main>
+
+  <dialog id="customerDialog">
+    <form id="customerForm" novalidate>
+      <h2 id="formTitle">مشتری جدید</h2>
+      <input type="hidden" name="id">
+
+      <label class="field">
+        <span>نام و نام خانوادگی <b class="req">*</b></span>
+        <input name="name" type="text" autocomplete="name">
+        <small class="error" data-error-for="name"></small>
+      </label>
+
+      <label class="field">
+        <span>شماره موبایل <b class="req">*</b></span>
+        <input name="phone" type="tel" inputmode="tel" dir="ltr" placeholder="۰۹۱۲۱۲۳۴۵۶۷">
+        <small class="error" data-error-for="phone"></small>
+      </label>
+
+      <label class="field">
+        <span>خودروی مورد علاقه</span>
+        <input name="car" type="text">
+      </label>
+
+      <label class="field">
+        <span>بودجه (تومان)</span>
+        <input name="budget" type="text" inputmode="numeric" dir="ltr">
+      </label>
+
+      <label class="field">
+        <span>منبع آشنایی</span>
+        <select name="source"></select>
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="btn primary">ذخیره</button>
+        <button type="button" class="btn" id="cancelBtn">انصراف</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="cardTemplate">
+    <article class="card" draggable="true">
+      <h3 class="card-name"></h3>
+      <div class="card-phone" dir="ltr"></div>
+      <dl class="card-info">
+        <dt>خودرو</dt><dd class="card-car"></dd>
+        <dt>بودجه</dt><dd class="card-budget"></dd>
+        <dt>منبع</dt><dd class="card-source"></dd>
+      </dl>
+      <div class="card-since"></div>
+      <details class="card-history">
+        <summary>تاریخچه</summary>
+        <ol></ol>
+      </details>
+      <div class="card-actions">
+        <select class="move-select" aria-label="انتقال به"></select>
+        <button type="button" class="btn small edit-btn">ویرایش</button>
+        <button type="button" class="btn small danger delete-btn">حذف</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="js/utils.js"></script>
+  <script src="js/sample-data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
