@@ -1,7 +1,10 @@
 // Layer 2 of the no-horizontal-scroll rule: an overflow tracker, active only with ?debug=1.
 // Re-checks after every DOM change (dialog opened, tab switched, card added, ...) and on
-// resize. Anything sticking out past the viewport's left/right edge gets a red outline and
-// a console entry; a corner badge shows green (clean) or red (count).
+// resize. Two kinds of offender get a red outline and a console entry:
+//   1. anything (element or text) sticking out past the viewport's left/right edge;
+//   2. any element whose content is wider than itself (scrollWidth > clientWidth), i.e. a
+//      horizontal scrollbar, clipped content or content spilling out of its box.
+// A corner badge shows green (clean) or red (count).
 // It measures element boxes, not scrollWidth, so it still sees overflow that the
 // overflow-x: clip safety net on html/body would hide.
 
@@ -81,7 +84,22 @@
     }
 
     const list = [...found].map(([el, f]) => ({ el, name: describe(el) + (f.text ? ' (text)' : ''), left: Math.round(f.left), right: Math.round(f.right) }));
-    return list.filter((f) => !found.has(f.el.parentElement)); // report the outermost only
+    const outside = list.filter((f) => !found.has(f.el.parentElement)); // outermost only
+
+    // Containers whose content is wider than themselves, even if still on screen: a
+    // horizontal scrollbar (overflow auto/scroll), silently cut content (hidden/clip,
+    // including the html/body safety net), or content spilling out (visible).
+    // Skipped: single-line <input>/<select>, which by design scroll their own text.
+    const wider = [];
+    for (const el of [document.documentElement, document.body, ...document.body.querySelectorAll('*')]) {
+      if (el.matches('input, select, template, script, style') || !el.clientWidth || !visible(el)) continue;
+      const excess = el.scrollWidth - el.clientWidth;
+      if (excess < 1) continue;
+      const ox = getComputedStyle(el).overflowX;
+      const kind = ox === 'auto' || ox === 'scroll' ? 'scrolls' : ox === 'visible' ? 'spills out' : 'clipped';
+      wider.push({ el, name: `${describe(el)} [content ${excess}px wider, ${kind}]`, left: 0, right: 0, excess });
+    }
+    return [...outside, ...wider];
   }
 
   let lastSignature = null;
@@ -105,7 +123,8 @@
     } else {
       console.group(`[overflow] ${offenders.length} element(s) past the viewport at width ${document.documentElement.clientWidth}`);
       for (const o of offenders) {
-        const sides = [o.left && `left +${o.left}px`, o.right && `right +${o.right}px`].filter(Boolean).join(', ');
+        const sides = o.excess ? `${o.excess}px wider than its box`
+          : [o.left && `left +${o.left}px`, o.right && `right +${o.right}px`].filter(Boolean).join(', ');
         console.warn(`${o.name} — ${sides}`, o.el);
       }
       console.groupEnd();
@@ -134,7 +153,7 @@
   badge.addEventListener('click', () => report(true));
 
   // For tests and the console: __overflowDebug.scan() -> current offenders.
-  window.__overflowDebug = { scan: () => report(true).map(({ name, left, right }) => ({ name, left, right })) };
+  window.__overflowDebug = { scan: () => report(true).map(({ name, left, right, excess }) => ({ name, left, right, excess })) };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule);
   else schedule();

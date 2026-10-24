@@ -19,11 +19,15 @@
 }
 
 /* =====================================================================================
-   RULE: the page never scrolls horizontally, at any width, in any state (see CLAUDE.md).
+   RULE: nothing scrolls horizontally, at any width, in any state (see CLAUDE.md): not the
+   page and not any element inside it, the board included. No overflow-x: auto/scroll
+   anywhere (the browser gives <dialog> and <textarea> overflow: auto by default; both are
+   overridden below). Content must fit: >= 1200px five equal shrinking columns, below
+   that one column at a time behind tabs.
    Layer 1 (this section + the rules below): nothing is allowed to be wider than its box.
-   Layer 2: js/debug-overflow.js, enabled with ?debug=1, outlines anything that sticks out.
+   Layer 2: js/debug-overflow.js, enabled with ?debug=1, outlines anything that sticks out
+   of the viewport and any element whose content is wider than itself.
    Layer 3: overflow-x: clip on html/body at the end of this file, a safety net only.
-   The only intended horizontal scroller is .board on tablet/desktop.
    Also: logical properties only (inset-inline-*, margin-inline, padding-inline, text-align
    start/end), no fixed widths over 320px (use max-width / %), no white-space: nowrap on
    anything whose text can grow.
@@ -150,17 +154,19 @@ body {
 }
 .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
-/* ---------- Mobile tabs (hidden on tablet/desktop) ---------- */
+/* ---------- Status tabs (only below 1200px, see the tabbed-view media query) ---------- */
 
 .tabs { display: none; }
+/* Tabs size to their label and wrap to a second row when they don't fit; never scroll. */
 .tab {
   font: inherit;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   min-width: 0;
-  padding: 6px 2px;
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-bottom: 3px solid var(--border);
   border-start-start-radius: 8px;
@@ -201,20 +207,18 @@ body {
 
 /* ---------- Board ---------- */
 
-/* The board is the only element allowed to scroll horizontally (tablet/desktop, when five
-   220px columns don't fit). It is a block child of body, so its own width never exceeds
-   the viewport; the extra width stays inside it. */
+/* >= 1200px: five equal columns that shrink with the window. No fixed or minimum width and
+   no scrolling; below 1200px the tabbed view takes over before columns get too narrow. */
 .board {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  display: flex;
   gap: 12px;
   padding: 16px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .column {
+  flex: 1 1 0;
+  min-width: 0;
   background: #eceef2;
   background: color-mix(in srgb, var(--col-color) 7%, #eceef2);
   border-radius: 10px;
@@ -273,7 +277,9 @@ body {
 .card-info dd { margin: 0; }
 .card-followup { font-size: .85rem; margin-block-end: 2px; }
 .card-since { color: var(--muted); font-size: .8rem; }
+/* Menu on its own row; the two buttons share the next row and wrap if even that is too narrow. */
 .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-block-start: 8px; }
+.card-actions .btn { flex: 1 1 auto; }
 .move-select { font: inherit; font-size: .85rem; flex: 1 1 100%; padding: 2px 4px; }
 
 .flag:empty { display: none; }
@@ -298,6 +304,10 @@ dialog {
   width: 100%;
   max-width: min(420px, var(--popup-max));
   max-height: calc(100dvh - 32px);
+  /* The browser default is overflow: auto (both axes). Tall content scrolls vertically;
+     horizontally everything must fit (layer 1), so nothing to scroll there. */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
 }
 dialog::backdrop { background: rgba(15, 23, 42, .45); }
@@ -347,6 +357,9 @@ dialog h2 { margin-top: 0; }
   border: 1px solid var(--border);
   border-radius: 6px;
   resize: vertical;
+  /* Default is overflow: auto; text soft-wraps, so only the vertical axis may scroll. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .timeline {
@@ -374,22 +387,36 @@ dialog h2 { margin-top: 0; }
 .timeline li.note { color: var(--muted); }
 .timeline li.note::before { background: var(--surface); border: 2px solid var(--primary); width: 8px; height: 8px; }
 
-/* ---------- Mobile ---------- */
+/* ---------- Tabbed view (< 1200px) ---------- */
 
-/* Mobile (< 768px; keep in sync with mobileQuery in app.js): columns become tabs, only the
-   active column is shown, moves go through the "انتقال به..." menu. */
-@media (max-width: 767.98px) {
+/* Below 1200px five columns would be too narrow, so the board shows one status at a time
+   behind tabs (keep the breakpoint in sync with tabbedQuery in app.js). Moves go through
+   the "انتقال به..." menu, or by dropping a dragged card on a tab. */
+@media (max-width: 1199.98px) {
   .tabs {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     padding: 12px 16px 0;
   }
-  .board { display: block; overflow-x: visible; padding-top: 0; }
+  .board { display: block; padding-top: 0; }
   .column { display: none; min-height: 0; border-top: none; border-start-start-radius: 0; border-start-end-radius: 0; }
   .column.active { display: block; }
   .column-head { display: none; }
-  .column-body { min-height: 0; }
+  /* The one visible column is wide on tablets: lay its cards out in as many columns as
+     fit, each at least 260px (or the full width if that's less). */
+  .column-body {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+    align-items: start;
+  }
+  .column-body > .empty { grid-column: 1 / -1; }
+}
+
+/* ---------- Phones (< 768px) ---------- */
+
+@media (max-width: 767.98px) {
   .toolbar input[type="search"] { max-width: none; }
   /* Compact 3-column summary so the tabs stay near the top of the screen. */
   .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

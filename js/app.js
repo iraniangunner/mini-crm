@@ -7,7 +7,7 @@ const dialog = document.getElementById('customerDialog');
 const form = document.getElementById('customerForm');
 
 // Must match the breakpoint in styles.css where columns turn into tabs.
-const mobileQuery = window.matchMedia('(max-width: 767.98px)');
+const tabbedQuery = window.matchMedia('(max-width: 1199.98px)');
 
 // Remembered per browser; a convenience only, so storage errors are ignored.
 const ACTIVE_TAB_KEY = 'miniCrm.activeTab';
@@ -139,8 +139,8 @@ function renderCard(c, today) {
     const to = select.value;
     if (!to || !Store.move(c.id, to)) return;
     render();
-    // On mobile the card leaves the visible tab, so say where it went.
-    if (mobileQuery.matches) showToast(`«${c.name}» به «${labelOf(STATUSES, to)}» منتقل شد.`);
+    // In the tabbed view the card leaves the visible tab, so say where it went.
+    if (tabbedQuery.matches) showToast(`«${c.name}» به «${labelOf(STATUSES, to)}» منتقل شد.`);
   });
 
   card.querySelector('.edit-btn').addEventListener('click', () => openForm(c));
