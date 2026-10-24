@@ -62,10 +62,14 @@ function formatBudget(n) {
   return n == null ? '—' : formatNumber(n) + ' تومان';
 }
 
-const dateTimeFmt = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' });
+const dateFmt = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+const timeFmt = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
+// "۱۴۰۵/۰۸/۰۲ ساعت ۱۰:۳۰" (Jalali). Built from parts so separators don't depend on the browser.
 function formatDateTime(iso) {
-  return dateTimeFmt.format(new Date(iso));
+  const d = new Date(iso);
+  const p = Object.fromEntries(dateFmt.formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.year}/${p.month}/${p.day} ساعت ${timeFmt.format(d)}`;
 }
 
 function uid() {

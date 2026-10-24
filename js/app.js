@@ -46,15 +46,13 @@ function renderCard(c) {
   card.querySelector('.card-source').textContent = labelOf(SOURCES, c.source);
   card.querySelector('.card-since').textContent = 'در این مرحله از ' + formatDateTime(enteredStatusAt(c));
 
-  const list = card.querySelector('.card-history ol');
-  for (const h of c.history) {
-    const li = document.createElement('li');
-    li.textContent = h.type === 'created'
-      ? `ثبت مشتری — ${formatDateTime(h.at)}`
-      : `${labelOf(STATUSES, h.from)} ← ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
-    list.append(li);
-  }
-  card.querySelector('.card-history summary').textContent = `تاریخچه (${toFaDigits(c.history.length)})`;
+  // Clicking the card (not its controls) opens the details window.
+  card.addEventListener('click', (e) => {
+    if (!e.target.closest('button, select')) openDetails(c);
+  });
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target === card) openDetails(c);
+  });
 
   const select = card.querySelector('.move-select');
   select.append(new Option('انتقال به...', '', true, true));
@@ -83,7 +81,85 @@ function renderCard(c) {
   return card;
 }
 
+// ---------- Summary bar ----------
+
+function renderSummary() {
+  const s = computeStats(Store.all(), STATUSES.map((x) => x.id));
+  const items = [
+    ['کل مشتری‌ها', toFaDigits(s.total), 'total'],
+    ...STATUSES.map((x) => [x.label, toFaDigits(s.byStatus[x.id]), x.id]),
+    ['نرخ تبدیل (خرید از کل)', formatRate(s.conversionRate), 'rate'],
+    ['میانگین روزهای جدید تا خرید', formatAvgDays(s.avgDays), 'avg'],
+  ];
+  const summary = document.getElementById('summary');
+  summary.replaceChildren(...items.map(([label, value, key]) => {
+    const box = document.createElement('div');
+    box.className = 'stat';
+    box.dataset.key = key;
+    const l = document.createElement('span');
+    l.className = 'stat-label';
+    l.textContent = label;
+    const v = document.createElement('strong');
+    v.className = 'stat-value';
+    v.textContent = value;
+    box.append(l, v);
+    return box;
+  }));
+}
+
+// ---------- Details window ----------
+
+const detailDialog = document.getElementById('detailDialog');
+
+function timelineText(h) {
+  return h.type === 'created'
+    ? `ثبت مشتری در ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`
+    : `از ${labelOf(STATUSES, h.from)} به ${labelOf(STATUSES, h.to)} — ${formatDateTime(h.at)}`;
+}
+
+function openDetails(c) {
+  detailDialog.querySelector('.detail-name').textContent = c.name;
+  const badge = detailDialog.querySelector('.detail-status');
+  badge.textContent = labelOf(STATUSES, c.status);
+  badge.style.setProperty('--col-color', `var(--col-${c.status})`);
+
+  const info = [
+    ['موبایل', formatPhone(c.phone)],
+    ['خودروی مورد علاقه', c.car || '—'],
+    ['بودجه', formatBudget(c.budget)],
+    ['منبع آشنایی', labelOf(SOURCES, c.source)],
+    ['تاریخ ثبت', formatDateTime(c.createdAt)],
+  ];
+  detailDialog.querySelector('.detail-info').replaceChildren(...info.flatMap(([k, v]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = k;
+    const dd = document.createElement('dd');
+    dd.textContent = v;
+    if (k === 'موبایل') dd.dir = 'ltr'; // keep "۰۹۱۲ ۷۷۷ ۸۸۹۹" from being reordered in RTL
+    return [dt, dd];
+  }));
+
+  // Newest first.
+  detailDialog.querySelector('.timeline').replaceChildren(...[...c.history].reverse().map((h) => {
+    const li = document.createElement('li');
+    li.style.setProperty('--col-color', `var(--col-${h.to})`);
+    li.textContent = timelineText(h);
+    return li;
+  }));
+
+  detailDialog.showModal();
+}
+
+document.getElementById('detailClose').addEventListener('click', () => detailDialog.close());
+// Close on backdrop click (click lands on the dialog element but outside its box).
+detailDialog.addEventListener('click', (e) => {
+  const r = detailDialog.getBoundingClientRect();
+  const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  if (e.target === detailDialog && !inside) detailDialog.close();
+});
+
 function render() {
+  renderSummary();
   // Newest arrivals in a column first.
   const customers = [...Store.all()].sort((a, b) => enteredStatusAt(b).localeCompare(enteredStatusAt(a)));
 
